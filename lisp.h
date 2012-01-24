@@ -7,6 +7,7 @@ typedef struct {
 } lisp_t;
 
 typedef enum {
+    ATOM_ERROR,
     ATOM_SYMBOL,
     ATOM_STRING,
     ATOM_INTEGER,
@@ -32,12 +33,10 @@ typedef struct {
     int number;
 } atom_integer_t;
 
-typedef struct {
-} lisp_list_t;
-
 typedef enum {
     OBJECT_ERROR,
     OBJECT_ATOM,
+    OBJECT_CONS,
     OBJECT_LIST,
 } object_type_t;
 
@@ -47,12 +46,18 @@ typedef struct {
 
 typedef struct {
     object_t object;
+    object_t *car;
+    object_t *cdr;
+} object_cons_t;
+
+typedef struct {
+    object_t object;
     atom_t *atom;
 } object_atom_t;
 
 typedef struct {
     object_t object;
-    list_t *list;
+    object_cons_t *cons;
 } object_list_t;
 
 typedef struct {

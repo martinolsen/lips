@@ -9,19 +9,26 @@
 
 #define ERROR(s) fprintf(stderr, "%s+%d: error: %s\n", __FILE__, __LINE__, s);
 
+static void *ALLOC(size_t);
+
 static object_atom_t *read_atom(lisp_t *, lexer_t *);
 static atom_string_t *read_atom_string(lexer_token_t *);
 static atom_integer_t *read_atom_integer(lexer_token_t *);
 static atom_symbol_t *read_atom_symbol(lexer_token_t *);
 
 static object_list_t *read_list(lisp_t *, lexer_t *);
+
 static object_t *eval_atom(lisp_t *, object_atom_t *);
 static object_t *eval_list(lisp_t *, object_list_t *);
 
-static const char *print_atom(lisp_t * lisp, object_atom_t *);
+static const char *print_atom(lisp_t *, object_atom_t *);
 static const char *print_atom_integer(atom_integer_t *);
 static const char *print_atom_string(atom_string_t *);
-static const char *print_list(lisp_t * lisp, object_list_t *);
+static const char *print_list(lisp_t *, object_list_t *);
+static const char *print_object(lisp_t *, object_t *);
+static const char *print_cons(lisp_t *, object_cons_t *);
+
+static object_list_t *cons(object_t *, object_list_t *);
 
 lisp_t *lisp_new() {
     lisp_t *lisp = calloc(1, sizeof(lisp_t));
@@ -59,6 +66,7 @@ sexpr_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
     if(sexpr->object != NULL)
         return sexpr;
 
+    ERROR("lisp_read: unexpected error");
     return NULL;
 }
 
@@ -71,8 +79,10 @@ object_t *lisp_eval(lisp_t * lisp, sexpr_t * sexpr) {
         return eval_atom(lisp, (object_atom_t *) sexpr->object);
     case OBJECT_LIST:
         return eval_list(lisp, (object_list_t *) sexpr->object);
+    case OBJECT_CONS:
+        ERROR("will not evaluate CONS object");
     case OBJECT_ERROR:
-        ERROR("unexpected error");
+        ERROR("lisp_eval: unexpected error");
     }
 
     return NULL;
@@ -88,11 +98,24 @@ const char *lisp_print(lisp_t * lisp, object_t * object) {
         return print_atom(lisp, (object_atom_t *) object);
     case OBJECT_LIST:
         return print_list(lisp, (object_list_t *) object);
+    case OBJECT_CONS:
+        ERROR("CONS' are not printable");
     case OBJECT_ERROR:
-        ERROR("expected atom or list");
+        ERROR("lisp_print: unexpected error");
     }
 
     return NULL;
+}
+
+static void *ALLOC(const size_t sz) {
+    void *o = calloc(1, sz);
+
+    if(o == NULL) {
+        perror("calloc");
+        exit(EXIT_FAILURE);
+    }
+
+    return o;
 }
 
 static object_atom_t *read_atom(lisp_t * lisp, lexer_t * lexer) {
@@ -201,37 +224,30 @@ static object_list_t *read_list(lisp_t * lisp, lexer_t * lexer) {
     if(token == NULL)
         return NULL;
 
-    object_list_t *object = calloc(1, sizeof(object_list_t));
+    object_list_t *list = ALLOC(sizeof(object_list_t));
+    object_cons_t *cons = ALLOC(sizeof(object_cons_t));
 
-    if(object == NULL) {
-        perror("calloc");
-        exit(EXIT_FAILURE);
-    }
-
-    object->object.type = OBJECT_LIST;
-    object->list = list_new();
+    list->object.type = OBJECT_LIST;
+    list->cons = cons;
+    cons->object.type = OBJECT_CONS;
 
     while(NULL == lexer_expect(lexer, TOKEN_LIST_END)) {
-        list_node_t *node = list_node_new(NULL);
+        if(cons->car == NULL)
+            cons->car = (object_t *) read_atom(lisp, lexer);
+        if(cons->car == NULL)
+            cons->car = (object_t *) read_list(lisp, lexer);
 
-        node->object = read_atom(lisp, lexer);
-        if(node->object != NULL) {
-            list_push(object->list, node);
-            continue;
+        if(cons->car == NULL) {
+            ERROR("read_list: expected atom or list");
+            return NULL;
         }
 
-        node->object = read_list(lisp, lexer);
-        if(node->object != NULL) {
-            list_push(object->list, node);
-            continue;
-        }
-
-        ERROR("expected atom or list");
-        free(object);
-        return NULL;
+        cons->cdr = ALLOC(sizeof(object_cons_t));
+        cons->cdr->type = OBJECT_CONS;
+        cons = (object_cons_t *) cons->cdr;
     }
 
-    return object;
+    return list;
 }
 
 static object_t *eval_atom(lisp_t * lisp, object_atom_t * atom) {
@@ -239,42 +255,139 @@ static object_t *eval_atom(lisp_t * lisp, object_atom_t * atom) {
 }
 
 static object_t *eval_list(lisp_t * lisp, object_list_t * list) {
-    fprintf(stderr, "eval_list\n");
+    if((list->cons == NULL) || (list->cons->car == NULL))
+        return (object_t *) list;
 
-    if(list->list->first == NULL) {
-        object_t *object = calloc(1, sizeof(object_t));
+    object_t *car = list->cons->car;
 
-        if(object == NULL) {
-            perror("calloc");
-            exit(EXIT_FAILURE);
-        }
-
-        return object;
-    }
-
-    object_t *first_object = (object_t *) list->list->first;
-
-    if(first_object->type != OBJECT_ATOM) {
+    if(car->type != OBJECT_ATOM) {
         ERROR("expecting atom as first element of list");
         return NULL;
     }
 
-    if((((object_atom_t *) first_object)->atom)->type != ATOM_SYMBOL) {
+    if((((object_atom_t *) car)->atom)->type != ATOM_SYMBOL) {
         ERROR("expecting symbol atom as first element of list");
         return NULL;
     }
 
+    atom_symbol_t *fun_symbol =
+        (atom_symbol_t *) ((object_atom_t *) car)->atom;
+
+    if(strncmp(fun_symbol->name, "CONS", 5) == 0) {
+        object_cons_t *cdr = (object_cons_t *) list->cons->cdr;
+
+        if(cdr == NULL) {
+            ERROR("cdr is NULL");
+            return NULL;
+        }
+
+        if(cdr->object.type != OBJECT_CONS) {
+            fprintf(stderr, "%d\n", cdr->object.type);
+            ERROR("cdr is not a CONS object");
+            return NULL;
+        }
+
+        object_t *cdar = cdr->car;
+
+        if(cdar->type != OBJECT_ATOM) {
+            ERROR("CDAR is not atom object");
+            return NULL;
+        }
+
+        object_cons_t *cddr = (object_cons_t *) cdr->cdr;
+
+        if(cddr->object.type != OBJECT_CONS) {
+            ERROR("CDDR is not CONS object");
+            return NULL;
+        }
+
+        object_list_t *cddar = (object_list_t *) cddr->car;
+
+        if((cddar != NULL) && (cddar->object.type != OBJECT_LIST)) {
+            fprintf(stderr, "CDDAR: %s (%d)\n",
+                    print_object(lisp, (object_t *) cddar),
+                    cddar->object.type);
+
+            ERROR("CDDAR is not a LIST");
+            return NULL;
+        }
+
+        object_t *head = cdar;
+        object_list_t *tail = cddar;
+
+        if((tail != NULL) && (tail->object.type != OBJECT_LIST)) {
+            fprintf(stderr, "tail is %d\n", tail->object.type);
+
+            ERROR("tail is not a LIST");
+            return NULL;
+        }
+
+        return (object_t *) cons(head,
+                                 (object_list_t *) eval_list(lisp, tail));
+    }
+
+    fprintf(stderr, "function name: %s\n", fun_symbol->name);
+    ERROR("eval_list: unknown function name");
     return NULL;
+}
 
-    //list_t *args = list_new();
+// apply a to list ==> (a . b)
+static object_list_t *cons(object_t * x, object_list_t * list) {
+    if(x == NULL)
+        return list;
 
-    // TODO: Get arguments (rest of list), evaluate on function
+    if(list == NULL) {
+        fprintf(stderr, "CONS - new list\n");
 
-    //object_t *val = eval_fun(lisp, fun_symbol, args);
+        list = ALLOC(sizeof(object_list_t));
+        list->object.type = OBJECT_LIST;
+    }
 
-    //list_destroy(args);
+    if((list->cons != NULL) && (list->cons->object.type != OBJECT_CONS)) {
+        ERROR("MEIN LEBEN!");
+        return NULL;
+    }
 
-    //return val;
+    object_cons_t *tail = list->cons;
+
+    list->cons = ALLOC(sizeof(object_cons_t));
+    list->cons->object.type = OBJECT_CONS;
+    list->cons->car = x;
+    list->cons->cdr = (object_t *) tail;
+
+    return list;
+}
+
+static const char *print_object(lisp_t * lisp, object_t * o) {
+    if(o == NULL)
+        return "";
+
+    switch (o->type) {
+    case OBJECT_ERROR:
+        return "ERR";
+    case OBJECT_ATOM:
+        return print_atom(lisp, (object_atom_t *) o);
+    case OBJECT_CONS:
+        return print_cons(lisp, (object_cons_t *) o);
+    case OBJECT_LIST:
+        return print_list(lisp, (object_list_t *) o);
+    }
+
+    ERROR("print_object: unknwon object");
+    return "N/A";
+}
+
+static const char *print_cons(lisp_t * lisp, object_cons_t * object) {
+    const size_t len = 1024;
+    char *s = ALLOC(len * sizeof(char));
+
+    object_t *car = (object_t *) object->car;
+    object_t *cdr = (object_t *) object->cdr;
+
+    snprintf(s, len, "%s %s\n", print_object(lisp, car),
+             print_object(lisp, cdr));
+
+    return s;
 }
 
 static const char *print_atom(lisp_t * lisp, object_atom_t * object) {
@@ -285,9 +398,13 @@ static const char *print_atom(lisp_t * lisp, object_atom_t * object) {
         return ((atom_symbol_t *) object->atom)->name;
     case ATOM_INTEGER:
         return print_atom_integer((atom_integer_t *) object->atom);
+    case ATOM_ERROR:
+        ERROR("print_atom: unknown error");
     }
 
-    ERROR("cannot print unknown atom type");
+    fprintf(stderr, "%d\n", object->atom->type);
+
+    ERROR("print_atom: cannot print unknown atom type");
     return NULL;
 }
 
@@ -320,43 +437,46 @@ static const char *print_atom_integer(atom_integer_t * integer) {
     return s;
 }
 
-static const char *print_list(lisp_t * lisp, object_list_t * object) {
+static const char *print_list(lisp_t * lisp, object_list_t * list) {
     const size_t len = 255;
-    char *s = calloc(len + 1, sizeof(char));
+    char *s = ALLOC(len * sizeof(char) + 1);
 
-    if((object->list == NULL) || (object->list->first == NULL)) {
-        strcpy(s, "()");
+    if((list == NULL) || (list->cons == NULL) || (list->cons->car == NULL)) {
+        strcpy(s, "NIL");
         return s;
     }
 
-    size_t idx = 0;
-    list_node_t *node = object->list->first;
+    object_cons_t *cons = list->cons;
 
-    do {
-        if(idx > len) {
-            ERROR("idx > len");
+    size_t si = 0;
+
+    while(cons->car != NULL) {
+        if(si > len) {
+            ERROR("si > len");
             free(s);
             return NULL;
         }
 
-        const char *n = lisp_print(lisp, (object_t *) node->object);
+        const char *n = lisp_print(lisp, cons->car);
+        int i = snprintf(s + si, len - si, "%s%s", si ? " " : "(", n);
 
-        int i;
-
-        if(0 ==
-           (i = snprintf(s + idx, len - idx, "%s%s", idx ? " " : "(", n))) {
+        if(i == 0) {
             ERROR("list too long");
-            free((char *) n);
             free(s);
             return NULL;
         }
 
-        idx += i;
+        si += i;
 
-        free((char *) n);
-    } while((node = node->next) != NULL);
+        cons = (object_cons_t *) cons->cdr;
 
-    snprintf(s + idx, len - idx, ")");
+        if(cons->object.type != OBJECT_CONS) {
+            ERROR("error in list");
+            return NULL;
+        }
+    };
+
+    snprintf(s + si, len - si, ")");
 
     return s;
 }

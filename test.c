@@ -8,6 +8,13 @@
 #include "lisp.h"
 #include "list.h"
 
+#define ADD_TEST(t, s) do { if(NULL == CU_add_test(suite, s, t)) { \
+        CU_cleanup_registry(); return CU_get_error(); } } while(0);
+
+/*****************************
+ ** List suite              **
+ *****************************/
+
 void test_list() {
     list_t *list = list_new();
 
@@ -33,13 +40,14 @@ int setup_list_suite() {
         return CU_get_error();
     }
 
-    if(NULL == CU_add_test(suite, "list push, pop", test_list)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    ADD_TEST(test_list, "list push, pop");
 
     return 0;
 }
+
+/*****************************
+ ** Lexer suite             **
+ *****************************/
 
 void test_lexer_end() {
     const char *s = "";
@@ -91,34 +99,44 @@ int setup_lexer_suite() {
         return CU_get_error();
     }
 
-    if(NULL == CU_add_test(suite, "end token", test_lexer_end)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "atom token", test_lexer_atom)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "list token", test_lexer_list)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "expect token", test_lexer_expect)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    ADD_TEST(test_lexer_end, "end token");
+    ADD_TEST(test_lexer_atom, "atom token");
+    ADD_TEST(test_lexer_list, "list token");
+    ADD_TEST(test_lexer_expect, "expect token");
 
     return 0;
+}
+
+/*****************************
+ ** Lisp suite              **
+ *****************************/
+
+static sexpr_t *read(lisp_t * lisp, const char *s) {
+    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
+    return sexpr;
+}
+
+static object_t *eval(lisp_t * lisp, const char *s) {
+    object_t *object = lisp_eval(lisp, read(lisp, s));
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
+    return object;
+}
+
+static const char *print(lisp_t * lisp, const char *s) {
+    const char *printed = lisp_print(lisp, eval(lisp, s));
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
+    return printed;
 }
 
 void test_lisp_read_atom() {
     const char *s = "1";
     lisp_t *lisp = lisp_new();
 
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
+    sexpr_t *sexpr = read(lisp, s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
     CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr->object);
@@ -128,14 +146,10 @@ void test_lisp_read_atom() {
 }
 
 void test_lisp_read_list() {
-    const char *s = "(1 2)";
+    const char *s = "(a b)";
     lisp_t *lisp = lisp_new();
 
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr->object);
-    CU_ASSERT_EQUAL_FATAL(sexpr->object->type, OBJECT_LIST);
+    read(lisp, s);
 
     lisp_destroy(lisp);
 }
@@ -143,12 +157,7 @@ void test_lisp_read_list() {
 void test_lisp_eval_atom() {
     const char *s = "1";
     lisp_t *lisp = lisp_new();
-
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
-
-    object_t *object = lisp_eval(lisp, sexpr);
+    object_t *object = eval(lisp, s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
 
@@ -161,37 +170,20 @@ void test_lisp_eval_atom() {
 }
 
 void test_lisp_eval_list() {
-    const char *s = "(1 2)";
     lisp_t *lisp = lisp_new();
 
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
-
-    object_t *object = lisp_eval(lisp, sexpr);
+    object_t *object = eval(lisp, "()");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-
-    CU_ASSERT_EQUAL(object->type, OBJECT_LIST);
 
     lisp_destroy(lisp);
 }
 
-void test_lisp_print_atom() {
+void test_lisp_print_atom_integer() {
     const char *s = "4";
     lisp_t *lisp = lisp_new();
+    const char *printed = print(lisp, s);
 
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
-
-    object_t *object = lisp_eval(lisp, sexpr);
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-
-    const char *printed = lisp_print(lisp, object);
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
     CU_ASSERT_STRING_EQUAL(printed, s);
 
     lisp_destroy(lisp);
@@ -200,61 +192,27 @@ void test_lisp_print_atom() {
 void test_lisp_print_atom_string() {
     const char *s = "\"hello, world!\"";
     lisp_t *lisp = lisp_new();
+    const char *printed = print(lisp, s);
 
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
-
-    object_t *object = lisp_eval(lisp, sexpr);
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-
-    const char *printed = lisp_print(lisp, object);
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
     CU_ASSERT_STRING_EQUAL_FATAL(printed, s);
 
     lisp_destroy(lisp);
 }
 
-void test_lisp_print_list() {
-    const char *s = "(1 2)";
+void test_lisp_print_list_nil() {
     lisp_t *lisp = lisp_new();
+    const char *printed = print(lisp, "()");
 
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
-
-    object_t *object = lisp_eval(lisp, sexpr);
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-
-    const char *printed = lisp_print(lisp, object);
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
-    CU_ASSERT_STRING_EQUAL(printed, s);
+    CU_ASSERT_STRING_EQUAL_FATAL(printed, "NIL");
 
     lisp_destroy(lisp);
 }
 
-object_t *eval(lisp_t * lisp, const char *s) {
-    return lisp_eval(lisp, lisp_read(lisp, s, strlen(s)));
-}
-
-void test_lisp_fun() {
+void test_lisp_cons() {
+    const char *s = "(CONS 1 (CONS 2 ()))";
     lisp_t *lisp = lisp_new();
 
-    CU_ASSERT_PTR_NOT_NULL_FATAL(eval(lisp, "(defun x () (5))"));
-
-    object_t *object = eval(lisp, "(x)");
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-    CU_ASSERT_EQUAL_FATAL(object->type, OBJECT_ATOM);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(((object_atom_t *) object)->atom);
-    CU_ASSERT_EQUAL_FATAL((((object_atom_t *) object)->atom)->type,
-                          ATOM_INTEGER);
-    CU_ASSERT_EQUAL_FATAL(((atom_integer_t *) ((object_atom_t *) object)->
-                           atom)->number, 5);
+    CU_ASSERT_STRING_EQUAL(print(lisp, s), "(1 2)");
 
     lisp_destroy(lisp);
 }
@@ -267,47 +225,59 @@ int setup_lisp_suite() {
         return CU_get_error();
     }
 
-    if(NULL == CU_add_test(suite, "lisp read atom", test_lisp_read_atom)) {
+    ADD_TEST(test_lisp_read_atom, "lisp read atom");
+    ADD_TEST(test_lisp_read_list, "lisp read list");
+    ADD_TEST(test_lisp_eval_atom, "lisp eval atom");
+    ADD_TEST(test_lisp_eval_list, "lisp eval list");
+    ADD_TEST(test_lisp_print_atom_integer, "lisp print atom integer");
+    ADD_TEST(test_lisp_print_atom_string, "lisp print atom string");
+    ADD_TEST(test_lisp_print_list_nil, "lisp print ()");
+    ADD_TEST(test_lisp_cons, "lisp CONS");
+
+    return 0;
+}
+
+/*****************************
+ ** Common Lisp suite       **
+ *****************************/
+
+void test_clisp_list() {
+    const char *s = "(list 1 2)";
+    lisp_t *lisp = lisp_new();
+
+    CU_ASSERT_STRING_EQUAL(print(lisp, s), "(1 2)");
+
+    lisp_destroy(lisp);
+}
+
+void test_clisp_defun() {
+    lisp_t *lisp = lisp_new();
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(eval(lisp, "(defun x () (5))"));
+
+    object_t *object = eval(lisp, "(x)");
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
+    CU_ASSERT_EQUAL_FATAL(object->type, OBJECT_ATOM);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(((object_atom_t *) object)->atom);
+    CU_ASSERT_EQUAL_FATAL((((object_atom_t *) object)->atom)->type,
+                          ATOM_INTEGER);
+    CU_ASSERT_EQUAL_FATAL(((atom_integer_t *) ((object_atom_t *)
+                                               object)->atom)->number, 5);
+
+    lisp_destroy(lisp);
+}
+
+int setup_clisp_suite() {
+    CU_pSuite suite = CU_add_suite("Common Lisp tests", NULL, NULL);
+
+    if(NULL == suite) {
         CU_cleanup_registry();
         return CU_get_error();
     }
 
-    if(NULL == CU_add_test(suite, "lisp read list", test_lisp_read_list)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "lisp eval atom", test_lisp_eval_atom)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "lisp eval list", test_lisp_eval_list)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "lisp print atom", test_lisp_print_atom)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL ==
-       CU_add_test(suite, "lisp print atom string",
-                   test_lisp_print_atom_string)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "lisp print list", test_lisp_print_list)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "lisp function", test_lisp_fun)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    ADD_TEST(test_clisp_list, "lisp LIST");
+    ADD_TEST(test_clisp_defun, "lisp DEFUN");
 
     return 0;
 }
@@ -319,6 +289,7 @@ int main() {
     setup_list_suite();
     setup_lexer_suite();
     setup_lisp_suite();
+    setup_clisp_suite();
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();
