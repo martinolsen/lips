@@ -1,4 +1,4 @@
-CFLAGS = -std=c99 -Wall -Werror -g -lm -lao
+CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic -lm -lao
 
 all: lips test
 

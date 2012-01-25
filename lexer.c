@@ -23,7 +23,7 @@ static bool accept(lexer_t * lexer, const char *c) {
     if(lexer->pos >= lexer->len)
         return false;
 
-    for(int i = 0; i < strlen(c); i++) {
+    for(size_t i = 0; i < strlen(c); i++) {
         if(lexer->text[lexer->pos] == c[i]) {
             lexer->pos++;
             return true;
@@ -39,7 +39,7 @@ static void clear_whitespace(lexer_t * lexer) {
 }
 
 // Like strcspn, but limited by len.
-static size_t strncspn(const char *s1, size_t len, const char *s2) {
+static size_t strncspn(const char *s1, int len, const char *s2) {
     const char *sc1 = s1;
 
     for(; ((sc1 - s1) < len) && (*sc1 != '\0'); sc1++) {

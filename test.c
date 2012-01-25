@@ -111,22 +111,22 @@ int setup_lexer_suite() {
  ** Lisp suite              **
  *****************************/
 
-static sexpr_t *read(lisp_t * lisp, const char *s) {
-    sexpr_t *sexpr = lisp_read(lisp, s, strlen(s));
+static sexpr_t *read(const char *s) {
+    sexpr_t *sexpr = lisp_read(s, strlen(s));
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
     return sexpr;
 }
 
-static object_t *eval(lisp_t * lisp, const char *s) {
-    object_t *object = lisp_eval(lisp, read(lisp, s));
+static object_t *eval(const char *s) {
+    object_t *object = lisp_eval(read(s));
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
     return object;
 }
 
-static const char *print(lisp_t * lisp, const char *s) {
-    const char *printed = lisp_print(lisp, eval(lisp, s));
+static const char *print(const char *s) {
+    const char *printed = lisp_print(eval(s));
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
     return printed;
@@ -134,30 +134,22 @@ static const char *print(lisp_t * lisp, const char *s) {
 
 void test_lisp_read_atom() {
     const char *s = "1";
-    lisp_t *lisp = lisp_new();
-
-    sexpr_t *sexpr = read(lisp, s);
+    sexpr_t *sexpr = read(s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
     CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr->object);
     CU_ASSERT_EQUAL_FATAL(sexpr->object->type, OBJECT_ATOM);
-
-    lisp_destroy(lisp);
 }
 
 void test_lisp_read_list() {
     const char *s = "(a b)";
-    lisp_t *lisp = lisp_new();
 
-    read(lisp, s);
-
-    lisp_destroy(lisp);
+    read(s);
 }
 
 void test_lisp_eval_atom() {
     const char *s = "1";
-    lisp_t *lisp = lisp_new();
-    object_t *object = eval(lisp, s);
+    object_t *object = eval(s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
 
@@ -165,56 +157,38 @@ void test_lisp_eval_atom() {
     CU_ASSERT_PTR_NOT_NULL_FATAL(((object_atom_t *) object)->atom);
     CU_ASSERT_EQUAL_FATAL(((object_atom_t *) object)->atom->type,
                           ATOM_INTEGER);
-
-    lisp_destroy(lisp);
 }
 
 void test_lisp_eval_list() {
-    lisp_t *lisp = lisp_new();
-
-    object_t *object = eval(lisp, "()");
+    object_t *object = eval("()");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-
-    lisp_destroy(lisp);
 }
 
 void test_lisp_print_atom_integer() {
     const char *s = "4";
-    lisp_t *lisp = lisp_new();
-    const char *printed = print(lisp, s);
+    const char *printed = print(s);
 
     CU_ASSERT_STRING_EQUAL(printed, s);
-
-    lisp_destroy(lisp);
 }
 
 void test_lisp_print_atom_string() {
     const char *s = "\"hello, world!\"";
-    lisp_t *lisp = lisp_new();
-    const char *printed = print(lisp, s);
+    const char *printed = print(s);
 
     CU_ASSERT_STRING_EQUAL_FATAL(printed, s);
-
-    lisp_destroy(lisp);
 }
 
 void test_lisp_print_list_nil() {
-    lisp_t *lisp = lisp_new();
-    const char *printed = print(lisp, "()");
+    const char *printed = print("()");
 
     CU_ASSERT_STRING_EQUAL_FATAL(printed, "NIL");
-
-    lisp_destroy(lisp);
 }
 
 void test_lisp_cons() {
-    const char *s = "(CONS 1 (CONS 2 ()))";
-    lisp_t *lisp = lisp_new();
-
-    CU_ASSERT_STRING_EQUAL(print(lisp, s), "(1 2)");
-
-    lisp_destroy(lisp);
+    CU_ASSERT_STRING_EQUAL_FATAL(print("(CONS 1 2)"), "(1 . 2)");
+    CU_ASSERT_STRING_EQUAL_FATAL(print("(CONS 2 (CONS 3 ()))"), "(2 3)");
+    CU_ASSERT_STRING_EQUAL_FATAL(print("(CONS 3 (CONS 4 5))"), "(3 4 . 5)");
 }
 
 int setup_lisp_suite() {
@@ -243,19 +217,14 @@ int setup_lisp_suite() {
 
 void test_clisp_list() {
     const char *s = "(list 1 2)";
-    lisp_t *lisp = lisp_new();
 
-    CU_ASSERT_STRING_EQUAL(print(lisp, s), "(1 2)");
-
-    lisp_destroy(lisp);
+    CU_ASSERT_STRING_EQUAL(print(s), "(1 2)");
 }
 
 void test_clisp_defun() {
-    lisp_t *lisp = lisp_new();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(eval("(defun x () (5))"));
 
-    CU_ASSERT_PTR_NOT_NULL_FATAL(eval(lisp, "(defun x () (5))"));
-
-    object_t *object = eval(lisp, "(x)");
+    object_t *object = eval("(x)");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
     CU_ASSERT_EQUAL_FATAL(object->type, OBJECT_ATOM);
@@ -264,8 +233,6 @@ void test_clisp_defun() {
                           ATOM_INTEGER);
     CU_ASSERT_EQUAL_FATAL(((atom_integer_t *) ((object_atom_t *)
                                                object)->atom)->number, 5);
-
-    lisp_destroy(lisp);
 }
 
 int setup_clisp_suite() {

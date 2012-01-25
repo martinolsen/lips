@@ -3,9 +3,6 @@
 
 #include "list.h"
 
-typedef struct {
-} lisp_t;
-
 typedef enum {
     ATOM_ERROR,
     ATOM_SYMBOL,
@@ -37,7 +34,6 @@ typedef enum {
     OBJECT_ERROR,
     OBJECT_ATOM,
     OBJECT_CONS,
-    OBJECT_LIST,
 } object_type_t;
 
 typedef struct {
@@ -56,19 +52,11 @@ typedef struct {
 } object_atom_t;
 
 typedef struct {
-    object_t object;
-    object_cons_t *cons;
-} object_list_t;
-
-typedef struct {
     object_t *object;
 } sexpr_t;
 
-lisp_t *lisp_new();
-void lisp_destroy(lisp_t *);
-
-sexpr_t *lisp_read(lisp_t *, const char *, size_t);
-object_t *lisp_eval(lisp_t *, sexpr_t *);
-const char *lisp_print(lisp_t *, object_t *);
+sexpr_t *lisp_read(const char *, size_t);
+object_t *lisp_eval(sexpr_t *);
+const char *lisp_print(object_t *);
 
 #endif
