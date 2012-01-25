@@ -287,7 +287,19 @@ static object_t *eval_list(object_cons_t * list) {
 
         object_t *tail = eval_object(third(list));
 
-        return (object_t *) cons(second(list), tail);
+        return (object_t *) cons(eval_object(second(list)), tail);
+    }
+    else if(strncmp(fun_symbol->name, "CAR", 4) == 0) {
+        if(list_length(list) != 2)
+            PANIC("eval_list: CAR take a single arguemnt");
+
+        return car((object_cons_t *) eval_object(second(list)));
+    }
+    else if(strncmp(fun_symbol->name, "CDR", 4) == 0) {
+        if(list_length(list) != 2)
+            PANIC("eval_list: CDR takes a single arguemnt");
+
+        return cdr((object_cons_t *) eval_object(second(list)));
     }
 
     DEBUG("hej");

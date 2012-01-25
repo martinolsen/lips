@@ -11,6 +11,8 @@
 #define ADD_TEST(t, s) do { if(NULL == CU_add_test(suite, s, t)) { \
         CU_cleanup_registry(); return CU_get_error(); } } while(0);
 
+#define ASSERT_PRINT(i, o) CU_ASSERT_STRING_EQUAL_FATAL(print(i), o);
+
 /*****************************
  ** List suite              **
  *****************************/
@@ -166,29 +168,43 @@ void test_lisp_eval_list() {
 }
 
 void test_lisp_print_atom_integer() {
-    const char *s = "4";
-    const char *printed = print(s);
-
-    CU_ASSERT_STRING_EQUAL(printed, s);
+    CU_ASSERT_STRING_EQUAL("4", "4");
 }
 
 void test_lisp_print_atom_string() {
     const char *s = "\"hello, world!\"";
-    const char *printed = print(s);
 
-    CU_ASSERT_STRING_EQUAL_FATAL(printed, s);
+    ASSERT_PRINT(s, s);
 }
 
 void test_lisp_print_list_nil() {
-    const char *printed = print("()");
+    ASSERT_PRINT("()", "NIL");
+}
 
-    CU_ASSERT_STRING_EQUAL_FATAL(printed, "NIL");
+void test_lisp_symbol_t() {
+    ASSERT_PRINT(print("T"), "T");
 }
 
 void test_lisp_cons() {
-    CU_ASSERT_STRING_EQUAL_FATAL(print("(CONS 1 2)"), "(1 . 2)");
-    CU_ASSERT_STRING_EQUAL_FATAL(print("(CONS 2 (CONS 3 ()))"), "(2 3)");
-    CU_ASSERT_STRING_EQUAL_FATAL(print("(CONS 3 (CONS 4 5))"), "(3 4 . 5)");
+    ASSERT_PRINT("(CONS 1 2)", "(1 . 2)");
+    ASSERT_PRINT("(CONS 2 (CONS 3 ()))", "(2 3)");
+    ASSERT_PRINT("(CONS 3 (CONS 4 5))", "(3 4 . 5)");
+    ASSERT_PRINT("(CONS (CONS 4 5) 6)", "((4 . 5) . 6)");
+
+    ASSERT_PRINT("(CONS 1 2)", "(1 . 2)");
+    ASSERT_PRINT("(CONS 1 (CONS 2 ()))", "(1 2)");
+}
+
+void test_lisp_car() {
+    ASSERT_PRINT("(CAR (CONS 3 2))", "3");
+    ASSERT_PRINT("(CAR (CONS (CONS 1 2) 3))", "(1 . 2)");
+    ASSERT_PRINT("(CAR (CONS 1 (CONS 2 3)))", "1");
+}
+
+void test_lisp_cdr() {
+    ASSERT_PRINT("(CDR (CONS 3 2))", "2");
+    ASSERT_PRINT("(CDR (CONS 1 (CONS 2 3)))", "(2 . 3)");
+    ASSERT_PRINT("(CDR (CONS (CONS 1 2) 3))", "3");
 }
 
 int setup_lisp_suite() {
@@ -206,45 +222,10 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_print_atom_integer, "lisp print atom integer");
     ADD_TEST(test_lisp_print_atom_string, "lisp print atom string");
     ADD_TEST(test_lisp_print_list_nil, "lisp print ()");
+    ADD_TEST(test_lisp_symbol_t, "lisp symbol T");
     ADD_TEST(test_lisp_cons, "lisp CONS");
-
-    return 0;
-}
-
-/*****************************
- ** Common Lisp suite       **
- *****************************/
-
-void test_clisp_list() {
-    const char *s = "(list 1 2)";
-
-    CU_ASSERT_STRING_EQUAL(print(s), "(1 2)");
-}
-
-void test_clisp_defun() {
-    CU_ASSERT_PTR_NOT_NULL_FATAL(eval("(defun x () (5))"));
-
-    object_t *object = eval("(x)");
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-    CU_ASSERT_EQUAL_FATAL(object->type, OBJECT_ATOM);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(((object_atom_t *) object)->atom);
-    CU_ASSERT_EQUAL_FATAL((((object_atom_t *) object)->atom)->type,
-                          ATOM_INTEGER);
-    CU_ASSERT_EQUAL_FATAL(((atom_integer_t *) ((object_atom_t *)
-                                               object)->atom)->number, 5);
-}
-
-int setup_clisp_suite() {
-    CU_pSuite suite = CU_add_suite("Common Lisp tests", NULL, NULL);
-
-    if(NULL == suite) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    ADD_TEST(test_clisp_list, "lisp LIST");
-    ADD_TEST(test_clisp_defun, "lisp DEFUN");
+    ADD_TEST(test_lisp_car, "lisp CAR");
+    ADD_TEST(test_lisp_cdr, "lisp CDR");
 
     return 0;
 }
@@ -256,7 +237,6 @@ int main() {
     setup_list_suite();
     setup_lexer_suite();
     setup_lisp_suite();
-    setup_clisp_suite();
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();
