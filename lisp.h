@@ -3,6 +3,7 @@
 
 #include "list.h"
 
+// TODO - atom is not a type; redo ATOM_* as OBJECT_*
 typedef enum {
     ATOM_ERROR,
     ATOM_SYMBOL,
@@ -34,6 +35,7 @@ typedef enum {
     OBJECT_ERROR,
     OBJECT_ATOM,
     OBJECT_CONS,
+    OBJECT_FUNCTION,
 } object_type_t;
 
 typedef struct {
@@ -50,6 +52,12 @@ typedef struct {
     object_t object;
     atom_t *atom;
 } object_atom_t;
+
+typedef struct {
+    object_t object;
+    object_t *(*fptr) (object_cons_t *);
+    int args;
+} object_function_t;
 
 typedef struct {
     object_t *object;

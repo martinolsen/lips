@@ -30,15 +30,18 @@
     for (j = 0; j < nptrs; j++) printf("%s\n", strings[j]); \
     free(strings); } while(0);
 
-static int debug(const char *file, const int line, const char *fmt, ...);
+//static int debug(const char *file, const int line, const char *fmt, ...);
 static int error(const char *file, const int line, const char *fmt, ...);
 static void panic(const char *file, const int line, const char *fmt, ...);
 
 static void *ALLOC(size_t);
 
 static object_t *object_new(object_type_t type);
-static object_atom_t *object_atom_new();
+static object_atom_t *object_atom_new(atom_t *);
 static object_cons_t *object_cons_new(object_t *, object_t *);
+static object_function_t *object_function_new(void);
+
+static object_atom_t *symbol(const char *);
 
 static object_t *read_object(lexer_t *);
 static object_atom_t *read_atom(lexer_t *);
@@ -62,9 +65,12 @@ static const char *print_cons(object_cons_t *);
 static object_cons_t *cons(object_t *, object_t *);
 static object_t *car(object_cons_t *);
 static object_t *cdr(object_cons_t *);
+static object_t *atom(object_t *);
+static object_t *eq(object_t *, object_t *);
 static object_t *first(object_cons_t *);
 static object_t *second(object_cons_t *);
-static object_t *third(object_cons_t *);
+
+//static object_t *third(object_cons_t *);
 static int list_length(object_cons_t *);
 
 sexpr_t *lisp_read(const char *s, size_t len) {
@@ -81,28 +87,25 @@ sexpr_t *lisp_read(const char *s, size_t len) {
     }
 
     sexpr->object = read_object(lexer);
-    if(sexpr->object != NULL)
-        return sexpr;
 
-    ERROR("lisp_read: unexpected error");
-    return NULL;
+    return sexpr;
 }
 
 object_t *lisp_eval(sexpr_t * sexpr) {
-    if(sexpr->object == NULL) {
-        ERROR("lisp_eval: no object supplied");
-        exit(EXIT_FAILURE);
-    }
-
     return eval_object(sexpr->object);
 }
 
 static object_t *eval_object(object_t * object) {
+    if(object == NULL)
+        return NULL;
+
     switch (object->type) {
     case OBJECT_ATOM:
         return eval_atom((object_atom_t *) object);
     case OBJECT_CONS:
         return eval_list((object_cons_t *) object);
+    case OBJECT_FUNCTION:
+        PANIC("Trying to evaluate function!");
     case OBJECT_ERROR:
         ERROR("eval_object: unexpected error");
     }
@@ -113,11 +116,6 @@ static object_t *eval_object(object_t * object) {
 
 // Render object to string. Client must free() returned value.
 const char *lisp_print(object_t * object) {
-    if(object == NULL) {
-        ERROR("lisp_print: will not print NULLed object");
-        exit(EXIT_FAILURE);
-    }
-
     return print_object(object);
 }
 
@@ -128,12 +126,7 @@ static object_t *read_object(lexer_t * lexer) {
     if(object != NULL)
         return object;
 
-    object = (object_t *) read_list(lexer);
-    if(object != NULL)
-        return object;
-
-    ERROR("read_object: unknown object");
-    return NULL;
+    return (object_t *) read_list(lexer);
 }
 
 static object_atom_t *read_atom(lexer_t * lexer) {
@@ -142,7 +135,7 @@ static object_atom_t *read_atom(lexer_t * lexer) {
     if(token == NULL)
         return NULL;
 
-    object_atom_t *object = object_atom_new();
+    object_atom_t *object = object_atom_new(NULL);
 
     object->atom = (atom_t *) read_atom_string(token);
     if(object->atom != NULL) {
@@ -232,7 +225,10 @@ static atom_integer_t *read_atom_integer(lexer_token_t * token) {
 static object_cons_t *read_list(lexer_t * lexer) {
     lexer_token_t *token = lexer_expect(lexer, TOKEN_LIST_START);
 
-    if(token == NULL)
+    if(token->type != TOKEN_LIST_START)
+        PANIC("read_list - no TOKEN_LIST_START!");
+
+    if((token == NULL) || (lexer_expect(lexer, TOKEN_LIST_END)))
         return NULL;
 
     object_cons_t *list = object_cons_new(NULL, NULL);
@@ -240,12 +236,6 @@ static object_cons_t *read_list(lexer_t * lexer) {
 
     while(NULL == lexer_expect(lexer, TOKEN_LIST_END)) {
         pair->car = read_object(lexer);
-
-        if(pair->car == NULL) {
-            ERROR("read_list: unexpected error");
-            return NULL;
-        }
-
         pair->cdr = (object_t *) object_cons_new(NULL, NULL);
 
         pair = (object_cons_t *) pair->cdr;
@@ -258,13 +248,78 @@ static object_t *eval_atom(object_atom_t * atom) {
     return (object_t *) atom;
 }
 
+static object_t *C_atom(object_cons_t * args) {
+    return atom(eval_object(first(args)));
+}
+
+static object_t *C_quote(object_cons_t * args) {
+    return first(args);
+}
+
+static object_t *C_eq(object_cons_t * args) {
+    return eq(eval_object(first(args)), eval_object(second(args)));
+}
+
+static object_t *C_cons(object_cons_t * args) {
+    return (object_t *) cons(eval_object(first(args)),
+                             eval_object(second(args)));
+}
+
+static object_t *C_car(object_cons_t * args) {
+    return car((object_cons_t *) eval_object(first(args)));
+}
+
+static object_t *C_cdr(object_cons_t * args) {
+    return cdr((object_cons_t *) eval_object(first(args)));
+}
+
+#define ADD_FUN(s, name, fun, argc) do { \
+    object_function_t *f = object_function_new(); \
+    f->fptr = fun; f->args = argc; \
+    s = object_cons_new((object_t *) f, (object_t *) s); \
+    s = object_cons_new((object_t *) symbol(name), (object_t *) s); } while(0);
+
+static object_cons_t *make_function_symbols() {
+    object_cons_t *symbols = NULL;
+
+    ADD_FUN(symbols, "CONS", C_cons, 2);
+    ADD_FUN(symbols, "CAR", C_car, 1);
+    ADD_FUN(symbols, "CDR", C_cdr, 1);
+    ADD_FUN(symbols, "EQ", C_eq, 2);
+    ADD_FUN(symbols, "QUOTE", C_quote, 1);
+    ADD_FUN(symbols, "ATOM", C_atom, 1);
+
+    return symbols;
+}
+
+static object_function_t *symbol_function(object_t * sym,
+                                          object_cons_t * symbols) {
+
+    while(symbols != NULL) {
+        if(symbols->object.type != OBJECT_CONS)
+            PANIC("invalid symbols LIST");
+
+        object_cons_t *val = (object_cons_t *) cdr(symbols);
+
+        if(eq(car(symbols), (object_t *) sym))
+            return (object_function_t *) car(val);
+
+        symbols = (object_cons_t *) cdr(val);
+    }
+
+    return NULL;
+}
+
 static object_t *eval_list(object_cons_t * list) {
-    if((list == NULL) || (car(list) == NULL))
-        return (object_t *) list;
+    if(list == NULL)
+        return NULL;
+
+    if(car(list) == NULL)
+        PANIC("eval_list: function is NULL");
 
     object_t *prefix = first(list);
 
-    if(prefix->type != OBJECT_ATOM) {
+    if(!atom(prefix)) {
         ERROR("expecting atom as prefix");
         return NULL;
     }
@@ -277,57 +332,42 @@ static object_t *eval_list(object_cons_t * list) {
     atom_symbol_t *fun_symbol =
         (atom_symbol_t *) ((object_atom_t *) prefix)->atom;
 
-    if(strncmp(fun_symbol->name, "CONS", 5) == 0) {
-        if(list_length(list) != 3) {
-            ERROR("eval_list: CONS takes two arguments, I got %d",
-                  list_length(list));
+    object_function_t *fun = symbol_function(prefix, make_function_symbols());
 
-            return (object_t *) object_cons_new(NULL, NULL);
-        }
+    if(fun == NULL)
+        PANIC("eval_list: unknown function name %s", fun_symbol->name);
 
-        object_t *tail = eval_object(third(list));
-
-        return (object_t *) cons(eval_object(second(list)), tail);
-    }
-    else if(strncmp(fun_symbol->name, "CAR", 4) == 0) {
-        if(list_length(list) != 2)
-            PANIC("eval_list: CAR take a single arguemnt");
-
-        return car((object_cons_t *) eval_object(second(list)));
-    }
-    else if(strncmp(fun_symbol->name, "CDR", 4) == 0) {
-        if(list_length(list) != 2)
-            PANIC("eval_list: CDR takes a single arguemnt");
-
-        return cdr((object_cons_t *) eval_object(second(list)));
+    if(fun->args != (list_length(list) - 1)) {
+        PANIC("function %s takes %d arguments", print_object(prefix),
+              fun->args);
     }
 
-    DEBUG("hej");
-    ERROR("eval_list: unknown function name %s", fun_symbol->name);
-    exit(EXIT_FAILURE);
+    object_t *r = (*fun->fptr) ((object_cons_t *) cdr(list));
+
+    return r;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////// BUILT-IN ///////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-#if 0
-// Return true if OBJECT is an atom, NIL otherwise
-static object_t *atom(object_t * object) {
-    if(object == NULL) {
-        ERROR("atom(NULL)");
-        exit(EXIT_FAILURE);
-    }
+// TODO TODO TODO - rename function, use ENVIRONMENTal lookup
+static object_atom_t *symbol(const char *t) {
+    object_atom_t *a = object_atom_new(ALLOC(sizeof(atom_symbol_t)));
 
-    if(object->type == OBJECT_ATOM) {
-        // TODO
-        ERROR("TREUHH");
-        exit(EXIT_FAILURE);
-    }
+    a->atom->type = ATOM_SYMBOL;
+    ((atom_symbol_t *) a->atom)->name = t;
+
+    return a;
+}
+
+// Return true if OBJECT is anything other than a CONS
+static object_t *atom(object_t * object) {
+    if((object == NULL) || (object->type != OBJECT_CONS))
+        return (object_t *) symbol("T");
 
     return NULL;
 }
-#endif
 
 // apply a to list ==> (a . b)   -- b MUST be a list
 static object_cons_t *cons(object_t * a, object_t * b) {
@@ -360,10 +400,86 @@ static object_t *cdr(object_cons_t * cons) {
     return cons->cdr;
 }
 
-static object_t *first(object_cons_t * list) {
-    if((list == NULL) || (list->object.type != OBJECT_CONS)) {
-        return (object_t *) object_cons_new(NULL, NULL);
+static object_t *eq(object_t * a, object_t * b) {
+    if(a == b)
+        return (object_t *) symbol("T");
+
+    if((a == NULL) || (b == NULL))
+        return NULL;
+
+    if(a->type != b->type)
+        return NULL;
+
+    if(a->type == OBJECT_ERROR) {
+        PANIC("eq(%s, %s) - type is OBJECT_ERROR", print_object(a),
+              print_object(b));
     }
+
+    if(a->type == OBJECT_CONS)
+        return NULL;
+
+    if(a->type != OBJECT_ATOM) {
+        PANIC("eq(%s, %s) - unknown object type", print_object(a),
+              print_object(b));
+    }
+
+    if((((object_atom_t *) a)->atom == NULL)
+       || (((object_atom_t *) a)->atom == NULL)) {
+        PANIC("eq(%s, %s) - invalid object atom", print_object(a),
+              print_object(b));
+    }
+
+    atom_t *a_atom = ((object_atom_t *) a)->atom;
+    atom_t *b_atom = ((object_atom_t *) b)->atom;
+
+    if(a_atom->type != b_atom->type)
+        return NULL;
+
+    if(a_atom->type == ATOM_ERROR) {
+        PANIC("eq(%s, %s) - type is ATOM_ERROR", print_object(a),
+              print_object(b));
+    }
+
+    if(a_atom->type == ATOM_SYMBOL) {
+        if(0 ==
+           strcmp(((atom_symbol_t *) a_atom)->name,
+                  ((atom_symbol_t *) b_atom)->name)) {
+
+            return (object_t *) symbol("T");
+        }
+
+        return NULL;
+    }
+
+    if(a_atom->type == ATOM_STRING) {
+        if(0 ==
+           strncmp(((atom_string_t *) a_atom)->string,
+                   ((atom_string_t *) b_atom)->string,
+                   ((atom_string_t *) b_atom)->len)) {
+
+            return (object_t *) symbol("T");
+        }
+
+        return NULL;
+    }
+
+    if(a_atom->type == ATOM_INTEGER) {
+        if(((atom_integer_t *) a_atom)->number ==
+           ((atom_integer_t *) b_atom)->number) {
+
+            return (object_t *) symbol("T");
+        }
+
+        return NULL;
+    }
+
+    PANIC("?");
+    return NULL;
+}
+
+static object_t *first(object_cons_t * list) {
+    if((list == NULL) || (list->object.type != OBJECT_CONS))
+        return NULL;
 
     return car(list);
 }
@@ -375,12 +491,14 @@ static object_t *second(object_cons_t * list) {
     return car((object_cons_t *) cdr(list));
 }
 
+#if 0
 static object_t *third(object_cons_t * list) {
     if((list == NULL) || (list_length(list) < 3))
         return NULL;
 
     return car((object_cons_t *) cdr((object_cons_t *) cdr(list)));
 }
+#endif
 
 static int list_length(object_cons_t * list) {
     if((list == NULL) || (list->object.type != OBJECT_CONS)) {
@@ -402,10 +520,8 @@ static int list_length(object_cons_t * list) {
 //////////////////////////////////////////////////////////////////////////////
 
 static const char *print_object(object_t * o) {
-    if(o == NULL) {
-        ERROR("DID YOU DRAG ME ALL THIS WAY FOR NOTHING???");
-        return NULL;
-    }
+    if(o == NULL)
+        return "NIL";
 
     switch (o->type) {
     case OBJECT_ERROR:
@@ -510,8 +626,12 @@ static const char *print_cons(object_cons_t * list) {
     return s;
 }
 
-static object_atom_t *object_atom_new() {
-    return (object_atom_t *) object_new(OBJECT_ATOM);
+static object_atom_t *object_atom_new(atom_t * a) {
+    object_atom_t *o = (object_atom_t *) object_new(OBJECT_ATOM);
+
+    o->atom = a;
+
+    return o;
 }
 
 static object_cons_t *object_cons_new(object_t * car, object_t * cdr) {
@@ -521,7 +641,10 @@ static object_cons_t *object_cons_new(object_t * car, object_t * cdr) {
     cons->cdr = cdr;
 
     return cons;
+}
 
+static object_function_t *object_function_new(void) {
+    return (object_function_t *) object_new(OBJECT_FUNCTION);
 }
 
 static object_t *object_new(object_type_t type) {
@@ -533,6 +656,9 @@ static object_t *object_new(object_type_t type) {
         break;
     case OBJECT_CONS:
         sz = sizeof(object_cons_t);
+        break;
+    case OBJECT_FUNCTION:
+        sz = sizeof(object_function_t);
         break;
     case OBJECT_ERROR:
         ERROR("object_new: unknwon error");
@@ -559,6 +685,7 @@ static void *ALLOC(const size_t sz) {
     return o;
 }
 
+#if 0
 static int debug(const char *file, const int line, const char *fmt, ...) {
     va_list ap;
 
@@ -571,6 +698,7 @@ static int debug(const char *file, const int line, const char *fmt, ...) {
 
     return fprintf(stderr, "debug[%s:%d] - %s\n", file, line, s);
 }
+#endif
 
 static int error(const char *file, const int line, const char *fmt, ...) {
     va_list ap;

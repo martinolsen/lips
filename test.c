@@ -121,10 +121,7 @@ static sexpr_t *read(const char *s) {
 }
 
 static object_t *eval(const char *s) {
-    object_t *object = lisp_eval(read(s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
-    return object;
+    return lisp_eval(read(s));
 }
 
 static const char *print(const char *s) {
@@ -161,10 +158,11 @@ void test_lisp_eval_atom() {
                           ATOM_INTEGER);
 }
 
-void test_lisp_eval_list() {
-    object_t *object = eval("()");
+void test_lisp_eval_nil() {
+    object_t *o = lisp_eval(read("()"));
 
-    CU_ASSERT_PTR_NOT_NULL_FATAL(object);
+    CU_ASSERT_PTR_NULL_FATAL(o);
+    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(o), "NIL");
 }
 
 void test_lisp_print_atom_integer() {
@@ -183,6 +181,17 @@ void test_lisp_print_list_nil() {
 
 void test_lisp_symbol_t() {
     ASSERT_PRINT(print("T"), "T");
+}
+
+void test_lisp_quote() {
+    ASSERT_PRINT("(QUOTE ())", "NIL");
+    ASSERT_PRINT("(QUOTE 1)", "1");
+    ASSERT_PRINT("(QUOTE A)", "A");
+    ASSERT_PRINT("(QUOTE (CONS 1 2))", "(CONS 1 2)");
+}
+
+void test_lisp_atom() {
+    ASSERT_PRINT("(ATOM (QUOTE A))", "T");
 }
 
 void test_lisp_cons() {
@@ -207,6 +216,15 @@ void test_lisp_cdr() {
     ASSERT_PRINT("(CDR (CONS (CONS 1 2) 3))", "3");
 }
 
+void test_lisp_eq() {
+    ASSERT_PRINT("(EQ (QUOTE A) (QUOTE B))", "NIL");
+    ASSERT_PRINT("(EQ (QUOTE A) (QUOTE A))", "T");
+    ASSERT_PRINT("(EQ (QUOTE (A B)) (QUOTE (A B)))", "NIL");
+    ASSERT_PRINT("(EQ (QUOTE ()) (QUOTE ()))", "T");
+    ASSERT_PRINT("(EQ () ())", "T");
+    ASSERT_PRINT("(EQ (CONS 1 NIL) (CONS 1 NIL))", "NIL");
+}
+
 int setup_lisp_suite() {
     CU_pSuite suite = CU_add_suite("Lisp tests", NULL, NULL);
 
@@ -218,14 +236,17 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_read_atom, "lisp read atom");
     ADD_TEST(test_lisp_read_list, "lisp read list");
     ADD_TEST(test_lisp_eval_atom, "lisp eval atom");
-    ADD_TEST(test_lisp_eval_list, "lisp eval list");
+    ADD_TEST(test_lisp_eval_nil, "lisp eval ()");
     ADD_TEST(test_lisp_print_atom_integer, "lisp print atom integer");
     ADD_TEST(test_lisp_print_atom_string, "lisp print atom string");
     ADD_TEST(test_lisp_print_list_nil, "lisp print ()");
     ADD_TEST(test_lisp_symbol_t, "lisp symbol T");
+    ADD_TEST(test_lisp_atom, "lisp ATOM");
+    ADD_TEST(test_lisp_quote, "lisp QUOTE");
     ADD_TEST(test_lisp_cons, "lisp CONS");
     ADD_TEST(test_lisp_car, "lisp CAR");
     ADD_TEST(test_lisp_cdr, "lisp CDR");
+    ADD_TEST(test_lisp_eq, "lisp EQ");
 
     return 0;
 }
