@@ -8,7 +8,6 @@ typedef enum {
     ATOM_ERROR,
     ATOM_SYMBOL,
     ATOM_STRING,
-    ATOM_INTEGER,
 } atom_type_t;
 
 typedef struct {
@@ -26,16 +25,12 @@ typedef struct {
     size_t len;
 } atom_string_t;
 
-typedef struct {
-    atom_t atom;
-    int number;
-} atom_integer_t;
-
 typedef enum {
     OBJECT_ERROR,
     OBJECT_ATOM,
     OBJECT_CONS,
     OBJECT_FUNCTION,
+    OBJECT_INTEGER,
 } object_type_t;
 
 typedef struct {
@@ -58,6 +53,11 @@ typedef struct {
     object_t *(*fptr) (object_cons_t *);
     int args;
 } object_function_t;
+
+typedef struct {
+    object_t object;
+    int number;
+} object_integer_t;
 
 typedef struct {
     object_t *object;

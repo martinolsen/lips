@@ -137,7 +137,7 @@ void test_lisp_read_atom() {
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr);
     CU_ASSERT_PTR_NOT_NULL_FATAL(sexpr->object);
-    CU_ASSERT_EQUAL_FATAL(sexpr->object->type, OBJECT_ATOM);
+    CU_ASSERT_EQUAL_FATAL(sexpr->object->type, OBJECT_INTEGER);
 }
 
 void test_lisp_read_list() {
@@ -152,10 +152,8 @@ void test_lisp_eval_atom() {
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
 
-    CU_ASSERT_EQUAL_FATAL(object->type, OBJECT_ATOM);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(((object_atom_t *) object)->atom);
-    CU_ASSERT_EQUAL_FATAL(((object_atom_t *) object)->atom->type,
-                          ATOM_INTEGER);
+    CU_ASSERT_EQUAL_FATAL(object->type, OBJECT_INTEGER);
+    CU_ASSERT_EQUAL_FATAL(((object_integer_t *) object)->number, 1);
 }
 
 void test_lisp_eval_nil() {

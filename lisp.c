@@ -40,13 +40,14 @@ static object_t *object_new(object_type_t type);
 static object_atom_t *object_atom_new(atom_t *);
 static object_cons_t *object_cons_new(object_t *, object_t *);
 static object_function_t *object_function_new(void);
+static object_integer_t *object_integer_new(int);
 
 static object_atom_t *symbol(const char *);
 
 static object_t *read_object(lexer_t *);
-static object_atom_t *read_atom(lexer_t *);
+static object_atom_t *read_atom(lexer_token_t *);
 static atom_string_t *read_atom_string(lexer_token_t *);
-static atom_integer_t *read_atom_integer(lexer_token_t *);
+static object_integer_t *read_integer(lexer_token_t *);
 static atom_symbol_t *read_atom_symbol(lexer_token_t *);
 
 static object_cons_t *read_list(lexer_t *);
@@ -56,7 +57,7 @@ static object_t *eval_atom(object_atom_t *);
 static object_t *eval_list(object_cons_t *);
 
 static const char *print_atom(object_atom_t *);
-static const char *print_atom_integer(atom_integer_t *);
+static const char *print_integer(object_integer_t *);
 static const char *print_atom_string(atom_string_t *);
 static const char *print_cons(object_cons_t *);
 static const char *print_object(object_t *);
@@ -104,6 +105,8 @@ static object_t *eval_object(object_t * object) {
         return eval_atom((object_atom_t *) object);
     case OBJECT_CONS:
         return eval_list((object_cons_t *) object);
+    case OBJECT_INTEGER:
+        return object;
     case OBJECT_FUNCTION:
         PANIC("Trying to evaluate function!");
     case OBJECT_ERROR:
@@ -122,37 +125,32 @@ const char *lisp_print(object_t * object) {
 static object_t *read_object(lexer_t * lexer) {
     object_t *object;
 
-    object = (object_t *) read_atom(lexer);
-    if(object != NULL)
-        return object;
-
-    return (object_t *) read_list(lexer);
-}
-
-static object_atom_t *read_atom(lexer_t * lexer) {
     lexer_token_t *token = lexer_expect(lexer, TOKEN_ATOM);
 
     if(token == NULL)
-        return NULL;
+        return (object_t *) read_list(lexer);
 
+    object = (object_t *) read_integer(token);
+    if(object != NULL)
+        return object;
+
+    object = (object_t *) read_atom(token);
+    if(object != NULL)
+        return object;
+
+    return NULL;
+}
+
+static object_atom_t *read_atom(lexer_token_t * token) {
     object_atom_t *object = object_atom_new(NULL);
 
     object->atom = (atom_t *) read_atom_string(token);
-    if(object->atom != NULL) {
+    if(object->atom != NULL)
         return object;
-    }
-
-    object->atom = (atom_t *) read_atom_integer(token);
-    if(object->atom != NULL) {
-        return object;
-    }
 
     object->atom = (atom_t *) read_atom_symbol(token);
-    if(object->atom != NULL) {
+    if(object->atom != NULL)
         return object;
-    }
-
-    free(object);
 
     ERROR("expected atom of string, integer or symbol");
     return NULL;
@@ -199,7 +197,7 @@ static atom_string_t *read_atom_string(lexer_token_t * token) {
     return atom;
 }
 
-static atom_integer_t *read_atom_integer(lexer_token_t * token) {
+static object_integer_t *read_integer(lexer_token_t * token) {
     if((token == NULL) || (token->type != TOKEN_ATOM) || (token->len == 0))
         return NULL;
 
@@ -209,17 +207,7 @@ static atom_integer_t *read_atom_integer(lexer_token_t * token) {
             return NULL;
     }
 
-    atom_integer_t *integer = calloc(1, sizeof(atom_symbol_t));
-
-    if(integer == NULL) {
-        perror("calloc");
-        exit(EXIT_FAILURE);
-    }
-
-    integer->atom.type = ATOM_INTEGER;
-    integer->number = atoi(token->text);
-
-    return integer;
+    return object_integer_new(atoi(token->text));
 }
 
 static object_cons_t *read_list(lexer_t * lexer) {
@@ -418,6 +406,15 @@ static object_t *eq(object_t * a, object_t * b) {
     if(a->type == OBJECT_CONS)
         return NULL;
 
+    if(a->type == OBJECT_INTEGER) {
+        if(((object_integer_t *) a)->number ==
+           ((object_integer_t *) a)->number) {
+            return (object_t *) symbol("T");
+        }
+
+        return NULL;
+    }
+
     if(a->type != OBJECT_ATOM) {
         PANIC("eq(%s, %s) - unknown object type", print_object(a),
               print_object(b));
@@ -456,16 +453,6 @@ static object_t *eq(object_t * a, object_t * b) {
            strncmp(((atom_string_t *) a_atom)->string,
                    ((atom_string_t *) b_atom)->string,
                    ((atom_string_t *) b_atom)->len)) {
-
-            return (object_t *) symbol("T");
-        }
-
-        return NULL;
-    }
-
-    if(a_atom->type == ATOM_INTEGER) {
-        if(((atom_integer_t *) a_atom)->number ==
-           ((atom_integer_t *) b_atom)->number) {
 
             return (object_t *) symbol("T");
         }
@@ -530,6 +517,8 @@ static const char *print_object(object_t * o) {
         return print_atom((object_atom_t *) o);
     case OBJECT_CONS:
         return print_cons((object_cons_t *) o);
+    case OBJECT_INTEGER:
+        return print_integer((object_integer_t *) o);
     default:
         ERROR("print_object: unknwon object of type #%d", o->type);
     }
@@ -543,8 +532,6 @@ static const char *print_atom(object_atom_t * object) {
         return print_atom_string((atom_string_t *) object->atom);
     case ATOM_SYMBOL:
         return ((atom_symbol_t *) object->atom)->name;
-    case ATOM_INTEGER:
-        return print_atom_integer((atom_integer_t *) object->atom);
     case ATOM_ERROR:
         ERROR("print_atom: unknown error");
     }
@@ -567,7 +554,7 @@ static const char *print_atom_string(atom_string_t * atom) {
     return s;
 }
 
-static const char *print_atom_integer(atom_integer_t * integer) {
+static const char *print_integer(object_integer_t * integer) {
     const size_t len = 15;
     char *s = calloc(len + 1, sizeof(char));
 
@@ -647,6 +634,13 @@ static object_function_t *object_function_new(void) {
     return (object_function_t *) object_new(OBJECT_FUNCTION);
 }
 
+static object_integer_t *object_integer_new(int num) {
+    object_integer_t *o = (object_integer_t *) object_new(OBJECT_INTEGER);
+
+    o->number = num;
+    return o;
+}
+
 static object_t *object_new(object_type_t type) {
     size_t sz = 0;
 
@@ -660,8 +654,11 @@ static object_t *object_new(object_type_t type) {
     case OBJECT_FUNCTION:
         sz = sizeof(object_function_t);
         break;
+    case OBJECT_INTEGER:
+        sz = sizeof(object_integer_t);
+        break;
     case OBJECT_ERROR:
-        ERROR("object_new: unknwon error");
+        PANIC("object_new: unknwon error");
     default:
         ERROR("object_new: unknown type");
         exit(EXIT_FAILURE);
