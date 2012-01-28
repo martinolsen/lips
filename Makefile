@@ -1,17 +1,25 @@
-LDFLAGS = -lm -lao
+CC = gcc
 CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic
+LDFLAGS = -lm -lao
+
+.PHONY: run-test clean all
 
 all: lips test
 
-%.o: $*.c
-	cc $(CFLAGS) -c $@
+run-test: test
+	./test
 
 lips: lips.o audio.o lexer.o lisp.o
-	cc $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 test: test.o list.o lexer.o lisp.o
-	cc $(CFLAGS) $(LDFLAGS) -lcunit -o $@ $^
-	time ./test
+	$(CC) $(CFLAGS) $(LDFLAGS) -lcunit -o $@ $^
+
+.c.o: %.c
+	$(CC) $(CFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS) -o $*.d -MM $<
 
 clean:
-	rm test lips *.o
+	rm -f test lips *.o *.d
+
+-include $(wildcard *.d)
