@@ -65,6 +65,7 @@ static object_t *car(object_cons_t *);
 static object_t *cdr(object_cons_t *);
 static object_t *atom(object_t *);
 static object_t *eq(object_t *, object_t *);
+static object_t *cond(object_cons_t *);
 static object_t *first(object_cons_t *);
 static object_t *second(object_cons_t *);
 
@@ -91,28 +92,6 @@ sexpr_t *lisp_read(const char *s, size_t len) {
 
 object_t *lisp_eval(sexpr_t * sexpr) {
     return eval_object(sexpr->object);
-}
-
-static object_t *eval_object(object_t * object) {
-    if(object == NULL)
-        return NULL;
-
-    switch (object->type) {
-    case OBJECT_CONS:
-        return eval_list((object_cons_t *) object);
-    case OBJECT_SYMBOL:
-        // TODO daksjldaksjd foof
-    case OBJECT_STRING:
-    case OBJECT_INTEGER:
-        return object;
-    case OBJECT_FUNCTION:
-        PANIC("Trying to evaluate function!");
-    case OBJECT_ERROR:
-        ERROR("eval_object: unexpected error");
-    }
-
-    ERROR("eval_object: unhandled object %s", print_object(object));
-    exit(EXIT_FAILURE);
 }
 
 // Render object to string. Client must free() returned value.
@@ -223,6 +202,10 @@ static object_t *C_eq(object_cons_t * args) {
     return eq(eval_object(first(args)), eval_object(second(args)));
 }
 
+static object_t *C_cond(object_cons_t * args) {
+    return cond(args);
+}
+
 static object_t *C_cons(object_cons_t * args) {
     return (object_t *) cons(eval_object(first(args)),
                              eval_object(second(args)));
@@ -249,6 +232,7 @@ static object_cons_t *make_function_symbols() {
     ADD_FUN(symbols, "CAR", C_car, 1);
     ADD_FUN(symbols, "CDR", C_cdr, 1);
     ADD_FUN(symbols, "EQ", C_eq, 2);
+    ADD_FUN(symbols, "COND", C_cond, -1);
     ADD_FUN(symbols, "QUOTE", C_quote, 1);
     ADD_FUN(symbols, "ATOM", C_atom, 1);
 
@@ -273,17 +257,39 @@ static object_function_t *symbol_function(object_t * sym,
     return NULL;
 }
 
+static object_t *eval_object(object_t * object) {
+    if(object == NULL)
+        return NULL;
+
+    switch (object->type) {
+    case OBJECT_CONS:
+        return eval_list((object_cons_t *) object);
+    case OBJECT_SYMBOL:
+        // TODO daksjldaksjd foof
+    case OBJECT_STRING:
+    case OBJECT_INTEGER:
+        return object;
+    case OBJECT_FUNCTION:
+        PANIC("Trying to evaluate function!");
+    case OBJECT_ERROR:
+        ERROR("eval_object: unexpected error");
+    }
+
+    ERROR("eval_object: unhandled object %s", print_object(object));
+    exit(EXIT_FAILURE);
+}
+
 static object_t *eval_list(object_cons_t * list) {
     if(list == NULL)
         return NULL;
 
     if(car(list) == NULL)
-        PANIC("eval_list: function is NULL");
+        PANIC("eval_list: function is NIL");
 
-    object_t *prefix = first(list);
+    object_t *prefix = eval_object(car(list));
 
     if(!atom(prefix))
-        PANIC("eval_list: prefix must be atom");
+        PANIC("eval_list: prefix must be atom, not %s", print_object(prefix));
 
     if(((object_symbol_t *) prefix)->object.type != OBJECT_SYMBOL)
         PANIC("eval_list: expecting symbol object as first element of list");
@@ -292,9 +298,10 @@ static object_t *eval_list(object_cons_t * list) {
     object_function_t *fun = symbol_function(prefix, make_function_symbols());
 
     if(fun == NULL)
-        PANIC("eval_list: unknown function name %s", fun_symbol->name);
+        PANIC("eval_list: unknown function name %s in %s", fun_symbol->name,
+              print_cons(list));
 
-    if(fun->args != (list_length(list) - 1)) {
+    if((fun->args != -1) && (fun->args != (list_length(list) - 1))) {
         PANIC("function %s takes %d arguments", print_object(prefix),
               fun->args);
     }
@@ -330,7 +337,7 @@ static object_cons_t *cons(object_t * a, object_t * b) {
 
 static object_t *car(object_cons_t * cons) {
     if(cons == NULL)
-        PANIC("car(NULL)");
+        return NULL;
 
     if(cons->object.type != OBJECT_CONS) {
         ERROR("car: object is not a list: %s (%d)\n",
@@ -342,14 +349,27 @@ static object_t *car(object_cons_t * cons) {
 }
 
 static object_t *cdr(object_cons_t * cons) {
-    if((cons == NULL) || (cons->object.type != OBJECT_CONS)) {
-        ERROR("cdr: object is not a list: %s\n",
+    if(cons == NULL)
+        return NULL;
+
+    if(cons->object.type != OBJECT_CONS)
+        PANIC("cdr: object is not a list: %s\n",
               print_object((object_t *) cons));
 
-        return NULL;
-    }
-
     return cons->cdr;
+}
+
+static object_t *cond(object_cons_t * list) {
+    if(list == NULL)
+        return NULL;
+
+    object_t *test = car((object_cons_t *) car(list));
+    object_t *res = car((object_cons_t *) cdr((object_cons_t *) car(list)));
+
+    if(eq(eval_object(test), (object_t *) symbol("T")))
+        return res;
+
+    return cond((object_cons_t *) cdr(list));
 }
 
 static object_t *eq(object_t * a, object_t * b) {

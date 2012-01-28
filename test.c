@@ -223,6 +223,14 @@ void test_lisp_eq() {
     ASSERT_PRINT("(EQ (CONS 1 NIL) (CONS 1 NIL))", "NIL");
 }
 
+void test_lisp_cond() {
+    ASSERT_PRINT("(COND (T T))", "T");
+    ASSERT_PRINT("(COND (NIL T))", "NIL");
+
+    ASSERT_PRINT("(COND ((EQ T T) T))", "T");
+    ASSERT_PRINT("(COND ((EQ NIL T) T))", "NIL");
+}
+
 int setup_lisp_suite() {
     CU_pSuite suite = CU_add_suite("Lisp tests", NULL, NULL);
 
@@ -245,6 +253,7 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_car, "lisp CAR");
     ADD_TEST(test_lisp_cdr, "lisp CDR");
     ADD_TEST(test_lisp_eq, "lisp EQ");
+    ADD_TEST(test_lisp_cond, "lisp COND");
 
     return 0;
 }
