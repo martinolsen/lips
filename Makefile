@@ -1,9 +1,17 @@
-CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic -lm -lao
+LDFLAGS = -lm -lao
+CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic
 
 all: lips test
 
-lips: lips.c audio.c lexer.c lisp.c
-	cc $(CFLAGS) -o lips lips.c audio.c lexer.c
+%.o: $*.c
+	cc $(CFLAGS) -c $@
 
-test: test.c list.c lexer.c lisp.c
-	cc $(CFLAGS) -lcunit -o test test.c list.c lexer.c lisp.c
+lips: lips.o audio.o lexer.o lisp.o
+	cc $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+test: test.o list.o lexer.o lisp.o
+	cc $(CFLAGS) $(LDFLAGS) -lcunit -o $@ $^
+	time ./test
+
+clean:
+	rm test lips *.o
