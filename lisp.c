@@ -10,13 +10,14 @@
 #include "list.h"
 
 #define DEBUG(f, args...) do { \
-    debug(__FILE__, __LINE__, f, ##args); } while(0);
+    l("debug", __FILE__, __LINE__, f, ##args); } while(0);
 
 #define ERROR(f, args...) do { \
-    error(__FILE__, __LINE__, f, ##args); } while(0);
+    l("error", __FILE__, __LINE__, f, ##args); } while(0);
 
 #define PANIC(f, args...) do { \
-    panic(__FILE__, __LINE__, f, ##args); } while(0);
+    l("panic", __FILE__, __LINE__, f, ##args); \
+    exit(EXIT_FAILURE); } while(0);
 
 #define BACKTRACE_MAX 100
 
@@ -30,35 +31,31 @@
     for (j = 0; j < nptrs; j++) printf("%s\n", strings[j]); \
     free(strings); } while(0);
 
-//static int debug(const char *file, const int line, const char *fmt, ...);
-static int error(const char *file, const int line, const char *fmt, ...);
-static void panic(const char *file, const int line, const char *fmt, ...);
+static int l(const char *, const char *, const int, const char *, ...);
 
 static void *ALLOC(size_t);
 
 static object_t *object_new(object_type_t type);
-static object_atom_t *object_atom_new(atom_t *);
 static object_cons_t *object_cons_new(object_t *, object_t *);
 static object_function_t *object_function_new(void);
 static object_integer_t *object_integer_new(int);
+static object_string_t *object_string_new(char *, size_t);
+static object_symbol_t *object_symbol_new(char *);
 
-static object_atom_t *symbol(const char *);
+static object_symbol_t *symbol(char *);
 
 static object_t *read_object(lexer_t *);
-static object_atom_t *read_atom(lexer_token_t *);
-static atom_string_t *read_atom_string(lexer_token_t *);
+static object_string_t *read_string(lexer_token_t *);
 static object_integer_t *read_integer(lexer_token_t *);
-static atom_symbol_t *read_atom_symbol(lexer_token_t *);
+static object_symbol_t *read_symbol(lexer_token_t *);
 
 static object_cons_t *read_list(lexer_t *);
 
 static object_t *eval_object(object_t *);
-static object_t *eval_atom(object_atom_t *);
 static object_t *eval_list(object_cons_t *);
 
-static const char *print_atom(object_atom_t *);
 static const char *print_integer(object_integer_t *);
-static const char *print_atom_string(atom_string_t *);
+static const char *print_string(object_string_t *);
 static const char *print_cons(object_cons_t *);
 static const char *print_object(object_t *);
 static const char *print_cons(object_cons_t *);
@@ -101,10 +98,11 @@ static object_t *eval_object(object_t * object) {
         return NULL;
 
     switch (object->type) {
-    case OBJECT_ATOM:
-        return eval_atom((object_atom_t *) object);
     case OBJECT_CONS:
         return eval_list((object_cons_t *) object);
+    case OBJECT_SYMBOL:
+        // TODO daksjldaksjd foof
+    case OBJECT_STRING:
     case OBJECT_INTEGER:
         return object;
     case OBJECT_FUNCTION:
@@ -134,47 +132,32 @@ static object_t *read_object(lexer_t * lexer) {
     if(object != NULL)
         return object;
 
-    object = (object_t *) read_atom(token);
+    object = (object_t *) read_string(token);
+    if(object != NULL)
+        return object;
+
+    object = (object_t *) read_symbol(token);
     if(object != NULL)
         return object;
 
     return NULL;
 }
 
-static object_atom_t *read_atom(lexer_token_t * token) {
-    object_atom_t *object = object_atom_new(NULL);
-
-    object->atom = (atom_t *) read_atom_string(token);
-    if(object->atom != NULL)
-        return object;
-
-    object->atom = (atom_t *) read_atom_symbol(token);
-    if(object->atom != NULL)
-        return object;
-
-    ERROR("expected atom of string, integer or symbol");
-    return NULL;
-}
-
-static atom_symbol_t *read_atom_symbol(lexer_token_t * token) {
+static object_symbol_t *read_symbol(lexer_token_t * token) {
     if(token->type != TOKEN_ATOM)
         return NULL;
 
-    atom_symbol_t *symbol = calloc(1, sizeof(atom_symbol_t));
+    object_symbol_t *symbol = object_symbol_new(calloc(1, token->len + 1));
 
-    if(symbol == NULL) {
-        perror("calloc");
-        exit(EXIT_FAILURE);
-    }
+    if(symbol->name == NULL)
+        PANIC("read_symbol: calloc");
 
-    symbol->atom.type = ATOM_SYMBOL;
-    symbol->name = calloc(1, token->len + 1);
     strncpy((char *restrict) symbol->name, token->text, token->len);
 
     return symbol;
 }
 
-static atom_string_t *read_atom_string(lexer_token_t * token) {
+static object_string_t *read_string(lexer_token_t * token) {
     if((token == NULL) || (token->type != TOKEN_ATOM) || (token->len == 0))
         return NULL;
 
@@ -182,19 +165,15 @@ static atom_string_t *read_atom_string(lexer_token_t * token) {
     if((token->text[0] != '"') || (token->text[token->len] != '"'))
         return NULL;
 
-    atom_string_t *atom = calloc(1, sizeof(atom_string_t));
+    object_string_t *o = object_string_new(calloc(token->len, sizeof(char)),
+                                           token->len - 1);
 
-    if(atom == NULL) {
-        perror("calloc");
-        exit(EXIT_FAILURE);
-    }
+    if(o->string == NULL)
+        PANIC("read_string: calloc");
 
-    atom->atom.type = ATOM_STRING;
-    atom->len = token->len - 1;
-    atom->string = calloc(1, sizeof(atom->len));
-    strncpy((char *restrict) atom->string, token->text + 1, token->len + 2);
+    strncpy((char *restrict) o->string, token->text + 1, token->len + 2);
 
-    return atom;
+    return o;
 }
 
 static object_integer_t *read_integer(lexer_token_t * token) {
@@ -230,10 +209,6 @@ static object_cons_t *read_list(lexer_t * lexer) {
     }
 
     return list;
-}
-
-static object_t *eval_atom(object_atom_t * atom) {
-    return (object_t *) atom;
 }
 
 static object_t *C_atom(object_cons_t * args) {
@@ -307,19 +282,13 @@ static object_t *eval_list(object_cons_t * list) {
 
     object_t *prefix = first(list);
 
-    if(!atom(prefix)) {
-        ERROR("expecting atom as prefix");
-        return NULL;
-    }
+    if(!atom(prefix))
+        PANIC("eval_list: prefix must be atom");
 
-    if((((object_atom_t *) prefix)->atom)->type != ATOM_SYMBOL) {
-        ERROR("expecting symbol atom as first element of list");
-        return NULL;
-    }
+    if(((object_symbol_t *) prefix)->object.type != OBJECT_SYMBOL)
+        PANIC("eval_list: expecting symbol object as first element of list");
 
-    atom_symbol_t *fun_symbol =
-        (atom_symbol_t *) ((object_atom_t *) prefix)->atom;
-
+    object_symbol_t *fun_symbol = (object_symbol_t *) prefix;
     object_function_t *fun = symbol_function(prefix, make_function_symbols());
 
     if(fun == NULL)
@@ -340,13 +309,8 @@ static object_t *eval_list(object_cons_t * list) {
 //////////////////////////////////////////////////////////////////////////////
 
 // TODO TODO TODO - rename function, use ENVIRONMENTal lookup
-static object_atom_t *symbol(const char *t) {
-    object_atom_t *a = object_atom_new(ALLOC(sizeof(atom_symbol_t)));
-
-    a->atom->type = ATOM_SYMBOL;
-    ((atom_symbol_t *) a->atom)->name = t;
-
-    return a;
+static object_symbol_t *symbol(char *t) {
+    return object_symbol_new(t);
 }
 
 // Return true if OBJECT is anything other than a CONS
@@ -415,32 +379,11 @@ static object_t *eq(object_t * a, object_t * b) {
         return NULL;
     }
 
-    if(a->type != OBJECT_ATOM) {
-        PANIC("eq(%s, %s) - unknown object type", print_object(a),
-              print_object(b));
-    }
-
-    if((((object_atom_t *) a)->atom == NULL)
-       || (((object_atom_t *) a)->atom == NULL)) {
-        PANIC("eq(%s, %s) - invalid object atom", print_object(a),
-              print_object(b));
-    }
-
-    atom_t *a_atom = ((object_atom_t *) a)->atom;
-    atom_t *b_atom = ((object_atom_t *) b)->atom;
-
-    if(a_atom->type != b_atom->type)
-        return NULL;
-
-    if(a_atom->type == ATOM_ERROR) {
-        PANIC("eq(%s, %s) - type is ATOM_ERROR", print_object(a),
-              print_object(b));
-    }
-
-    if(a_atom->type == ATOM_SYMBOL) {
+    if(a->type == OBJECT_STRING) {
         if(0 ==
-           strcmp(((atom_symbol_t *) a_atom)->name,
-                  ((atom_symbol_t *) b_atom)->name)) {
+           strncmp(((object_string_t *) a)->string,
+                   ((object_string_t *) a)->string,
+                   ((object_string_t *) a)->len)) {
 
             return (object_t *) symbol("T");
         }
@@ -448,11 +391,9 @@ static object_t *eq(object_t * a, object_t * b) {
         return NULL;
     }
 
-    if(a_atom->type == ATOM_STRING) {
-        if(0 ==
-           strncmp(((atom_string_t *) a_atom)->string,
-                   ((atom_string_t *) b_atom)->string,
-                   ((atom_string_t *) b_atom)->len)) {
+    if(a->type == OBJECT_SYMBOL) {
+        if(0 == strcmp(((object_symbol_t *) a)->name,
+                       ((object_symbol_t *) b)->name)) {
 
             return (object_t *) symbol("T");
         }
@@ -513,43 +454,29 @@ static const char *print_object(object_t * o) {
     switch (o->type) {
     case OBJECT_ERROR:
         return "ERR";
-    case OBJECT_ATOM:
-        return print_atom((object_atom_t *) o);
     case OBJECT_CONS:
         return print_cons((object_cons_t *) o);
     case OBJECT_INTEGER:
         return print_integer((object_integer_t *) o);
-    default:
-        ERROR("print_object: unknwon object of type #%d", o->type);
+    case OBJECT_FUNCTION:
+        return "#<Function>";   // TODO
+    case OBJECT_STRING:
+        return print_string((object_string_t *) o);
+    case OBJECT_SYMBOL:
+        return ((object_symbol_t *) o)->name;
     }
+
+    ERROR("print_object: unknwon object of type #%d", o->type);
 
     return NULL;
 }
 
-static const char *print_atom(object_atom_t * object) {
-    switch (object->atom->type) {
-    case ATOM_STRING:
-        return print_atom_string((atom_string_t *) object->atom);
-    case ATOM_SYMBOL:
-        return ((atom_symbol_t *) object->atom)->name;
-    case ATOM_ERROR:
-        ERROR("print_atom: unknown error");
-    }
-
-    fprintf(stderr, "%d\n", object->atom->type);
-
-    ERROR("print_atom: cannot print unknown atom type");
-    return NULL;
-}
-
-static const char *print_atom_string(atom_string_t * atom) {
-    const size_t len = atom->len + 3;
+static const char *print_string(object_string_t * str) {
+    const size_t len = str->len + 3;
     char *s = calloc(len, sizeof(char));
 
-    if(snprintf(s, len, "\"%s\"", atom->string) == 0) {
-        free(s);
-        return NULL;
-    }
+    if(snprintf(s, len, "\"%s\"", str->string) == 0)
+        PANIC("print_string: could not write string %s", str->string);
 
     return s;
 }
@@ -613,14 +540,6 @@ static const char *print_cons(object_cons_t * list) {
     return s;
 }
 
-static object_atom_t *object_atom_new(atom_t * a) {
-    object_atom_t *o = (object_atom_t *) object_new(OBJECT_ATOM);
-
-    o->atom = a;
-
-    return o;
-}
-
 static object_cons_t *object_cons_new(object_t * car, object_t * cdr) {
     object_cons_t *cons = (object_cons_t *) object_new(OBJECT_CONS);
 
@@ -641,30 +560,45 @@ static object_integer_t *object_integer_new(int num) {
     return o;
 }
 
-static object_t *object_new(object_type_t type) {
-    size_t sz = 0;
+static object_string_t *object_string_new(char *s, size_t n) {
+    object_string_t *o = (object_string_t *) object_new(OBJECT_STRING);
 
+    o->string = s;
+    o->len = n;
+
+    return o;
+}
+
+static object_symbol_t *object_symbol_new(char *s) {
+    object_symbol_t *o = (object_symbol_t *) object_new(OBJECT_SYMBOL);
+
+    o->name = s;
+
+    return o;
+}
+
+static size_t object_sz(object_type_t type) {
     switch (type) {
-    case OBJECT_ATOM:
-        sz = sizeof(object_atom_t);
-        break;
     case OBJECT_CONS:
-        sz = sizeof(object_cons_t);
-        break;
+        return sizeof(object_cons_t);
     case OBJECT_FUNCTION:
-        sz = sizeof(object_function_t);
-        break;
+        return sizeof(object_function_t);
     case OBJECT_INTEGER:
-        sz = sizeof(object_integer_t);
-        break;
+        return sizeof(object_integer_t);
+    case OBJECT_STRING:
+        return sizeof(object_string_t);
+    case OBJECT_SYMBOL:
+        return sizeof(object_symbol_t);
     case OBJECT_ERROR:
         PANIC("object_new: unknwon error");
-    default:
-        ERROR("object_new: unknown type");
-        exit(EXIT_FAILURE);
     }
 
-    object_t *object = ALLOC(sz);
+    ERROR("object_new: unknown type");
+    exit(EXIT_FAILURE);
+}
+
+static object_t *object_new(object_type_t type) {
+    object_t *object = ALLOC(object_sz(type));
 
     object->type = type;
 
@@ -682,8 +616,9 @@ static void *ALLOC(const size_t sz) {
     return o;
 }
 
-#if 0
-static int debug(const char *file, const int line, const char *fmt, ...) {
+static int l(const char *lvl, const char *file, const int line,
+             const char *fmt, ...) {
+
     va_list ap;
 
     const size_t len = 256;
@@ -693,34 +628,5 @@ static int debug(const char *file, const int line, const char *fmt, ...) {
     vsnprintf(s, len, fmt, ap);
     va_end(ap);
 
-    return fprintf(stderr, "debug[%s:%d] - %s\n", file, line, s);
-}
-#endif
-
-static int error(const char *file, const int line, const char *fmt, ...) {
-    va_list ap;
-
-    const size_t len = 256;
-    char *s = calloc(len, sizeof(char));
-
-    va_start(ap, fmt);
-    vsnprintf(s, len, fmt, ap);
-    va_end(ap);
-
-    return fprintf(stderr, "error[%s:%d] - %s\n", file, line, s);
-}
-
-static void panic(const char *file, const int line, const char *fmt, ...) {
-    va_list ap;
-
-    const size_t len = 256;
-    char *s = calloc(len, sizeof(char));
-
-    va_start(ap, fmt);
-    vsnprintf(s, len, fmt, ap);
-    va_end(ap);
-
-    fprintf(stderr, "panic[%s:%d] - %s\n", file, line, s);
-
-    exit(EXIT_FAILURE);
+    return fprintf(stderr, "%s[%s:%d] - %s\n", lvl, file, line, s);
 }
