@@ -7,51 +7,25 @@
 
 #include "lisp.h"
 #include "lisp_print.h"
+#include "lisp_eval.h"
 #include "lexer.h"
 #include "list.h"
-
-static object_t *object_new(object_type_t type);
-static object_cons_t *object_cons_new(object_t *, object_t *);
-static object_function_t *object_function_new(void);
-static object_lambda_t *object_lambda_new(object_cons_t *, object_t *);
-static object_integer_t *object_integer_new(int);
-static object_string_t *object_string_new(char *, size_t);
-static object_symbol_t *object_symbol_new(char *);
 
 static object_t *read_object(lexer_t *);
 static object_string_t *read_string(lexer_token_t *);
 static object_integer_t *read_integer(lexer_token_t *);
 static object_symbol_t *read_symbol(lexer_token_t *);
 
+static object_t *object_new(object_type_t type);
 static object_cons_t *read_list(lexer_t *);
 
-static object_t *eval_object(lisp_t *, lisp_env_t *, object_t *);
-static object_t *eval_list(lisp_t *, lisp_env_t *, object_cons_t *);
-static object_t *eval_symbol(lisp_t *, lisp_env_t *, object_symbol_t *);
-
-//static object_t *third(object_cons_t *);
-static int list_length(object_cons_t *);
-
-sexpr_t *lisp_read(const char *s, size_t len) {
+object_t *lisp_read(const char *s, size_t len) {
     lexer_t *lexer = lexer_init(s, len);
 
     if(lexer == NULL)
         return NULL;
 
-    sexpr_t *sexpr = calloc(1, sizeof(sexpr_t));
-
-    if(sexpr == NULL) {
-        perror("calloc");
-        exit(EXIT_FAILURE);
-    }
-
-    sexpr->object = read_object(lexer);
-
-    return sexpr;
-}
-
-object_t *lisp_eval(lisp_t * l, sexpr_t * sexpr) {
-    return eval_object(l, l->env, sexpr->object);
+    return read_object(lexer);
 }
 
 static object_t *read_object(lexer_t * lexer) {
@@ -148,7 +122,7 @@ static object_cons_t *read_list(lexer_t * lexer) {
 static object_t *C_atom(lisp_t * l, lisp_env_t * env __attribute__ ((unused)),
                         object_cons_t * args) {
 
-    return atom(l, eval_object(l, env, first(args)));
+    return atom(l, lisp_eval(l, env, first(args)));
 }
 
 static object_t *C_quote(lisp_t * l __attribute__ ((unused)),
@@ -161,8 +135,8 @@ static object_t *C_quote(lisp_t * l __attribute__ ((unused)),
 static object_t *C_eq(lisp_t * l, lisp_env_t * env __attribute__ ((unused)),
                       object_cons_t * args) {
 
-    return eq(l, eval_object(l, env, first(args)),
-              eval_object(l, env, second(args)));
+    return eq(l, lisp_eval(l, env, first(args)),
+              lisp_eval(l, env, second(args)));
 }
 
 static object_t *C_cond(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
@@ -170,16 +144,16 @@ static object_t *C_cond(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
 }
 
 static object_t *C_cons(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return (object_t *) cons(eval_object(l, env, first(args)),
-                             eval_object(l, env, second(args)));
+    return (object_t *) cons(lisp_eval(l, env, first(args)),
+                             lisp_eval(l, env, second(args)));
 }
 
 static object_t *C_car(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return car((object_cons_t *) eval_object(l, env, first(args)));
+    return car((object_cons_t *) lisp_eval(l, env, first(args)));
 }
 
 static object_t *C_cdr(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return cdr((object_cons_t *) eval_object(l, env, first(args)));
+    return cdr((object_cons_t *) lisp_eval(l, env, first(args)));
 }
 
 static object_t *C_label(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
@@ -196,179 +170,17 @@ static object_t *C_lambda(lisp_t * l
 static object_t *C_assoc(lisp_t * l, lisp_env_t * env
                          __attribute__ ((unused)), object_cons_t * args) {
 
-    return assoc(l, eval_object(l, env, first(args)),
-                 (object_cons_t *) eval_object(l, env, second(args)));
+    return assoc(l, lisp_eval(l, env, first(args)),
+                 (object_cons_t *) lisp_eval(l, env, second(args)));
 }
 
-static object_t *eval_lambda(lisp_t * l, lisp_env_t * env,
-                             object_lambda_t * lm) {
-
-    if(lm == NULL)
-        PANIC("eval_lambda: lambda is null");
-
-    DEBUG("eval_lambda[%s, %s]", print_cons(env->labels),
-          lisp_print((object_t *) lm));
-
-    object_t *r = eval_object(l, env, lm->expr);
-
-    DEBUG(" result: %s", lisp_print(r));
-
-    return r;
-}
-
-static object_t *eval_object(lisp_t * l, lisp_env_t * env, object_t * object) {
-    if(object == NULL)
-        return NULL;
-
-    switch (object->type) {
-    case OBJECT_CONS:
-        return eval_list(l, env, (object_cons_t *) object);
-    case OBJECT_SYMBOL:
-        return eval_symbol(l, env, (object_symbol_t *) object);
-    case OBJECT_STRING:
-    case OBJECT_INTEGER:
-        return object;
-    case OBJECT_LAMBDA:
-        return eval_lambda(l, env, (object_lambda_t *) object);
-    case OBJECT_FUNCTION:
-        PANIC("Trying to evaluate function!");
-    case OBJECT_ERROR:
-        ERROR("eval_object: unexpected error");
-    }
-
-    ERROR("eval_object: unhandled object %s", lisp_print(object));
-    exit(EXIT_FAILURE);
-}
-
-static object_t *eval_symbol(lisp_t * l, lisp_env_t * env,
-                             object_symbol_t * sym) {
-
-    if(eq(l, (object_t *) sym, (object_t *) object_symbol_new("NIL")))
-        return NULL;
-
-    if(eq(l, (object_t *) sym, l->t))
-        return l->t;
-
-    while(env != NULL) {
-        object_t *obj = assoc(l, (object_t *) sym, env->labels);
-
-        if(obj != NULL)
-            return obj;
-
-        env = env->outer;
-    }
-
-    PANIC("eval_symbol[_, %s] - no such symbol in environment",
-          lisp_print((object_t *) sym));
-
-    return NULL;
-}
-
-static lisp_env_t *lisp_env_new(lisp_env_t * outer, object_cons_t * labels) {
+lisp_env_t *lisp_env_new(lisp_env_t * outer, object_cons_t * labels) {
     lisp_env_t *env = calloc(1, sizeof(lisp_env_t));
 
     env->outer = outer;
     env->labels = labels;
 
     return env;
-}
-
-static object_t *eval_list(lisp_t * l, lisp_env_t * env, object_cons_t * list) {
-    if((list == NULL) || (car(list) == NULL))
-        return NULL;
-
-    if(car(list) == NULL)
-        PANIC("eval_list: function is NIL");
-
-    object_t *prefix = eval_object(l, env, car(list));
-
-    if(!atom(l, prefix)) {
-        PANIC("eval_list: prefix must be atom, not %s, in %s",
-              lisp_print(prefix), lisp_print((object_t *) list));
-    }
-
-    if(prefix == NULL) {
-        PANIC("eval_list[_, %s] - prefix is NIL",
-              lisp_print((object_t *) list));
-    }
-
-    if(prefix->type == OBJECT_FUNCTION) {
-        object_function_t *fun = (object_function_t *) prefix;
-
-        if((fun->args != -1) && (fun->args != (list_length(list) - 1))) {
-            PANIC("function %s takes %d arguments",
-                  lisp_print((object_t *) prefix), fun->args);
-        }
-
-        // TODO remove args, should be in env - like with lambdas
-        return (*fun->fptr) (l, env, (object_cons_t *) cdr(list));
-    }
-
-    DEBUG("eval_list[_, _, %s]", print_cons(list));
-
-    if(prefix->type == OBJECT_LAMBDA) {
-        DEBUG("eval_list: LAMBDA!");
-
-        object_lambda_t *lm = (object_lambda_t *) prefix;
-
-        DEBUG(" args: %s, list: %s", print_cons(lm->args),
-              lisp_print(cdr(list)));
-
-        object_cons_t *args = (object_cons_t *) cdr(list);
-
-#if 0
-        object_cons_t *labels = pair(l, lm->args, args);
-#else
-        object_cons_t *labels = NULL;
-
-        while(args != NULL) {
-            object_t *lbl = eval_object(l, env, car(args));
-
-            DEBUG(" label %s => %s", lisp_print(car(args)), lisp_print(lbl));
-
-            DEBUG(" 1 labels: %s", print_cons(labels));
-            labels = object_cons_new(lbl, (object_t *) labels);
-            DEBUG(" 2 labels: %s", print_cons(labels));
-
-            args = (object_cons_t *) cdr(args);
-        }
-#endif
-
-        DEBUG(" 3 labels: %s", print_cons(labels));
-        lisp_env_t *e = lisp_env_new(env, labels);
-
-        return eval_lambda(l, e, lm);
-    }
-
-    PANIC("ARE WE DONE HERE?");
-    (void) pair(l, NULL, NULL);
-
-    if(((object_symbol_t *) prefix)->object.type != OBJECT_SYMBOL) {
-        PANIC("eval_list: expecting symbol, not %s",
-              lisp_print((object_t *) prefix));
-    }
-
-    object_symbol_t *fun_symbol = (object_symbol_t *) prefix;
-
-    PANIC("TODO, next line!");
-    //object_function_t *fun = (object_function_t *) assoc(l, prefix, l->env);
-    object_function_t *fun = NULL;
-
-    if(fun->object.type != OBJECT_FUNCTION) {
-        PANIC("eval_list: unknown function name %s in %s", fun_symbol->name,
-              lisp_print((object_t *) list));
-    }
-
-    if((fun->args != -1) && (fun->args != (list_length(list) - 1))) {
-        PANIC("function %s takes %d arguments", lisp_print(prefix),
-              fun->args);
-    }
-
-    // TODO remove args, should be in env
-    object_t *r = (*fun->fptr) (l, lisp_env_new(env, NULL),
-                                (object_cons_t *) cdr(list));
-
-    return r;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -420,7 +232,7 @@ object_t *cond(lisp_t * l, lisp_env_t * env, object_cons_t * list) {
     object_t *test = car((object_cons_t *) car(list));
     object_t *res = car((object_cons_t *) cdr((object_cons_t *) car(list)));
 
-    if(eq(l, eval_object(l, env, test), l->t))
+    if(eq(l, lisp_eval(l, env, test), l->t))
         return res;
 
     return cond(l, env, (object_cons_t *) cdr(list));
@@ -494,7 +306,8 @@ object_t *second(object_cons_t * list) {
 
 #if 0
 object_t *third(object_cons_t * list) {
-    if((list == NULL) || (list_length(list) < 3))
+  if((list == NULL) || (list_length(list) < 3) iindent: Standard input: 600: Warning: Unterminated character constant indent: Standard input: 599: Warning: Unterminated character constant indent: Standard input: 598: Warning: Unterminated character constant indent: Standard input: 597: Warning: Unterminated character constant indent: Standard input: 596: Warning: Unterminated character constant indent: Standard input: 595: Warning: Unterminated character constant indent: Standard input: 594: Warning: Unterminated character constant indent: Standard input: 593: Warning: Unterminated character constant indent: Standard input: 592: Warning: Unterminated character constant indent: Standard input: 591: Warning: Unterminated character constant indent: Standard input: 588: Warning: Unterminated character constant indent: Standard input: 587: Warning: Unterminated character constant indent: Standard input: 586: Warning: Unterminated character constant indent: Standard input: 585: Warning: Unterminated character constant indent: Standard input: 584: Warning: Unterminated character constant indent: Standard input: 583: Warning: Unterminated character constant indent: Standard input: 582: Warning: Unterminated character constant indent: Standard input: 581: Warning: Unterminated character constant indent: Standard input: 580: Warning: Unterminated character constant indent: Standard input: 579: Warning: Unterminated character constant indent: Standard input: 578: Warning: Unterminated character constant indent: Standard input: 577: Warning: Unterminated character constant indent: Standard input: 576: Warning: Unterminated character constant indent: Standard input: 575: Warning: Unterminated character constant indent: Standard input: 574: Warning: Unterminated character constant indent: Standard input: 573: Warning: Unterminated character constant indent: Standard input: 572: Warning: Unterminated character constant indent: Standard input: 571: Warning: Unterminated character constant indent: Standard input: 570: Warning: Unterminated character constant indent: Standard input: 569: Warning: Unterminated character constant indent: Standard input: 568: Warning: Unterminated character constant indent: Standard input: 567: Warning: Unterminated character constant indent: Standard input: 566: Warning: Unterminated character constant indent: Standard input: 565: Warning: Unterminated character constant indent: Standard input: 564: Warning: Unterminated character constant indent: Standard input: 563: Warning: Unterminated character constant indent: Standard input: 562: Warning: Unterminated character constant indent: Standard input: 561: Warning: Unterminated character constant indent: Standard input: 559: Warning: Unterminated character constant ndent: Standard input: 557: Warning:Unterminated character
+       constant)
         return NULL;
 
     return car((object_cons_t *) cdr((object_cons_t *) cdr(list)));
@@ -507,7 +320,7 @@ object_t *assoc(lisp_t * l, object_t * x, object_cons_t * list) {
         return NULL;
 
 #if 0
-    DEBUG("assoc[_, %s, %s]", lisp_print(x), print_cons(list));
+    DEBUG("assoc[_, %s, %s]", lisp_print(x), lisp_print((object_t *) list));
     DEBUG(" %s vs %s", lisp_print(x), lisp_print(car(list)));
 #endif
 
@@ -517,23 +330,56 @@ object_t *assoc(lisp_t * l, object_t * x, object_cons_t * list) {
     return assoc(l, x, (object_cons_t *) cdr(list));
 }
 
+/*
+(defun pai(x y)
+ (cond((and(null x) (null y)) '())
+              ((and (not (atom x)) (not (atom y)))
+               (cons (list (car x) (car y))
+                     (pair (cdr x) (cdr y))))))
+                     */
 object_cons_t *pair(lisp_t * l, object_cons_t * k, object_cons_t * v) {
-    if((k == NULL) && (v == NULL))
+    if((k == NULL) || (v == NULL))
         return NULL;
 
-    DEBUG("pair[%s@%p, %s@%p]", print_cons(k), k, print_cons(v), v);
+    DEBUG("pair[%s@%p, %s@%p]", lisp_print((object_t *) k), k,
+          lisp_print((object_t *) v), v);
 
-    if(atom(l, (object_t *) k) || atom(l, (object_t *) v)) {
-        PANIC("pair[%s, %s] - Atom!", lisp_print((object_t *) k),
-              lisp_print((object_t *) v));
-    }
+    if(atom(l, (object_t *) k) || atom(l, (object_t *) v))
+        return NULL;
 
+#if 0
     object_cons_t *tail = pair(l, (object_cons_t *) cdr(k),
                                (object_cons_t *) cdr(v));
     object_cons_t *head = object_cons_new((object_t *) car(k),
                                           (object_t *)
                                           object_cons_new((object_t *) car(v),
                                                           NULL));
+
+    return object_cons_new((object_t *) head, (object_t *) tail);
+#endif
+
+    // TODO - make list(object_t *...) helper
+    object_cons_t *head =
+        object_cons_new(car(k), (object_t *) object_cons_new(car(v), NULL));
+
+    object_cons_t *tail =
+        pair(l, (object_cons_t *) cdr(k), (object_cons_t *) cdr(v));
+
+    DEBUG(" head: %s, tail: %s", lisp_print((object_t *) head),
+          lisp_print((object_t *) tail));
+
+    if(car(head) == NULL)
+        head = NULL;
+
+    if(car(tail) == NULL)
+        tail = NULL;
+
+    DEBUG(" head: %s, tail: %s", lisp_print((object_t *) head),
+          lisp_print((object_t *) tail));
+
+    DEBUG(" pair: %s", lisp_print((object_t *)
+                                  object_cons_new((object_t *) head,
+                                                  (object_t *) tail)));
 
     return object_cons_new((object_t *) head, (object_t *) tail);
 }
@@ -569,7 +415,8 @@ object_t *label(lisp_t * l, lisp_env_t * env, object_symbol_t * sym,
 }
 
 object_t *lambda(object_cons_t * args, object_t * expr) {
-    DEBUG("lambda[_, %s, %s]", print_cons(args), lisp_print(expr));
+    DEBUG("lambda[_, %s, %s]", lisp_print((object_t *) args),
+          lisp_print(expr));
 
     return (object_t *) object_lambda_new(args, expr);
 }
@@ -589,7 +436,7 @@ int list_length(object_cons_t * list) {
     return i;
 }
 
-static object_cons_t *object_cons_new(object_t * car, object_t * cdr) {
+object_cons_t *object_cons_new(object_t * car, object_t * cdr) {
     object_cons_t *cons = (object_cons_t *) object_new(OBJECT_CONS);
 
     cons->car = car;
@@ -598,12 +445,11 @@ static object_cons_t *object_cons_new(object_t * car, object_t * cdr) {
     return cons;
 }
 
-static object_function_t *object_function_new(void) {
+object_function_t *object_function_new(void) {
     return (object_function_t *) object_new(OBJECT_FUNCTION);
 }
 
-static object_lambda_t *object_lambda_new(object_cons_t * args,
-                                          object_t * expr) {
+object_lambda_t *object_lambda_new(object_cons_t * args, object_t * expr) {
 
     object_lambda_t *l = (object_lambda_t *) object_new(OBJECT_LAMBDA);
 
@@ -613,14 +459,14 @@ static object_lambda_t *object_lambda_new(object_cons_t * args,
     return l;
 }
 
-static object_integer_t *object_integer_new(int num) {
+object_integer_t *object_integer_new(int num) {
     object_integer_t *o = (object_integer_t *) object_new(OBJECT_INTEGER);
 
     o->number = num;
     return o;
 }
 
-static object_string_t *object_string_new(char *s, size_t n) {
+object_string_t *object_string_new(char *s, size_t n) {
     object_string_t *o = (object_string_t *) object_new(OBJECT_STRING);
 
     o->string = s;
@@ -629,7 +475,7 @@ static object_string_t *object_string_new(char *s, size_t n) {
     return o;
 }
 
-static object_symbol_t *object_symbol_new(char *s) {
+object_symbol_t *object_symbol_new(char *s) {
     object_symbol_t *o = (object_symbol_t *) object_new(OBJECT_SYMBOL);
 
     o->name = s;

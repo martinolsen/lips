@@ -20,8 +20,6 @@ static const char *print_object(object_t * o) {
     if(o == NULL)
         return "NIL";
 
-    DEBUG("print_object[_] - type %d", o->type);
-
     switch (o->type) {
     case OBJECT_ERROR:
         return "ERR";
@@ -39,7 +37,7 @@ static const char *print_object(object_t * o) {
         return ((object_symbol_t *) o)->name;
     }
 
-    ERROR("print_object: unknwon object of type #%d", o->type);
+    PANIC("print_object: unknwon object of type #%d", o->type);
 
     return NULL;
 }
@@ -80,93 +78,29 @@ static const char *print_cons(object_cons_t * list) {
         object_t *obj = (object_t *) list;
         bool dotted = true;
 
-        DEBUG("a");
-
         if(obj->type == OBJECT_CONS)
             dotted = false;
 
         if(!dotted)
             obj = car(list);
 
-        DEBUG("b");
-
         if((si > 1) && (obj == NULL))
             break;
 
-        DEBUG("c");
-
         const char *prefix = (si > 1) ? (dotted ? " . " : " ") : "";
-
-        DEBUG("d");
 
         si += snprintf(s + si, len - si, "%s%s", prefix, print_object(obj));
 
-        DEBUG("e");
-
         if(si > len)
             PANIC("print_cons[..] - string overflow");
-
-        DEBUG("f");
 
         if(list->object.type == OBJECT_CONS)
             list = (object_cons_t *) cdr(list);
         else
             list = NULL;
-
-        DEBUG("g");
     }
 
-    /*
-     * size_t si = snprintf(0, len, ".");
-     * 
-     * 
-     * do {
-     * object_t *obj = car(list);
-     * 
-     * 
-     * } while(obj != NULL);
-     * 
-     * while(0) {
-     * if(si > len) {
-     * ERROR("si > len");
-     * free(s);
-     * return NULL;
-     * }
-     * 
-     * object_t *element = (object_t *) list;
-     * bool dotted = true;
-     * 
-     * if(list->object.type == OBJECT_CONS) {
-     * element = car(list);
-     * dotted = false;
-     * }
-     * 
-     * char *restrict start = s + si;
-     * const size_t end = len - si;
-     * 
-     * const char *prefix = si ? (dotted ? " . " : " ") : "(";
-     * 
-     * si += snprintf(start, end, "%s%s", prefix, print_object(element));
-     * 
-     * // TODO - bounds check
-     * 
-     * if(dotted)
-     * break;
-     * 
-     * list = (object_cons_t *) cdr(list);
-     * };
-     * 
-     * if((list != NULL) && (list->object.type != OBJECT_CONS)) {
-     * char *restrict start = s + si;
-     * const size_t end = len - si;
-     * 
-     * si += snprintf(start, end, " . %s", print_object((object_t *) list));
-     * }
-     */
-
     snprintf(s + si, len - si, ")");
-
-    DEBUG("print_cons[..]: %s", s);
 
     return s;
 }

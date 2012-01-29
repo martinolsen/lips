@@ -2,17 +2,20 @@ CC = gcc
 CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic
 LDFLAGS = -lm -lao
 
-.PHONY: run-test clean all
+.PHONY: run-test clean all tags
 
-all: lips test
+all: lips test tags
 
-run-test: test
+tags: $(wildcard *.c) $(wildcard *.h)
+	ctags *.c
+
+run-test: all
 	./test
 
-lips: lips.o audio.o lexer.o lisp.o
+lips: lips.o audio.o lisp_print.o lisp_eval.o lexer.o lisp.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-test: test.o list.o lisp_print.o lexer.o lisp.o
+test: test.o list.o lisp_print.o lisp_eval.o lexer.o lisp.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -lcunit -o $@ $^
 
 .c.o: %.c
