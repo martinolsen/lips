@@ -6,6 +6,7 @@
 
 #include "lexer.h"
 #include "lisp.h"
+#include "lisp_print.h"
 #include "list.h"
 
 #define ADD_TEST(t, s) do { if(NULL == CU_add_test(suite, s, t)) { \
@@ -246,6 +247,13 @@ void test_lisp_label() {
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
 }
 
+void test_lisp_lambda() {
+    ASSERT_PRINT("((LAMBDA (X) (CONS X (QUOTE (B)))) (QUOTE A))", "(A B)");
+    ASSERT_PRINT
+        ("((LAMBDA (X Y) (CONS X (CDR Y))) (QUOTE Z) (QUOTE (A B C)))",
+         "(Z B C)");
+}
+
 int setup_lisp_suite() {
     CU_pSuite suite = CU_add_suite("Lisp tests", NULL, NULL);
 
@@ -270,6 +278,7 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_eq, "lisp EQ");
     ADD_TEST(test_lisp_cond, "lisp COND");
     ADD_TEST(test_lisp_label, "lisp LABEL");
+    ADD_TEST(test_lisp_lambda, "lisp LAMBDA");
 
     return 0;
 }
