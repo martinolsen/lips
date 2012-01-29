@@ -24,12 +24,6 @@ typedef struct {
 
 typedef struct {
     object_t object;
-    object_t *(*fptr) (object_cons_t *);
-    int args;
-} object_function_t;
-
-typedef struct {
-    object_t object;
     int number;
 } object_integer_t;
 
@@ -42,14 +36,30 @@ typedef struct {
 typedef struct {
     object_t object;
     const char *name;
+    // function
+    object_t *variable;         // variable
 } object_symbol_t;
 
 typedef struct {
     object_t *object;
 } sexpr_t;
 
+typedef struct {
+    object_cons_t *env;
+    // TODO - add constant T symbol
+    object_t *t;
+} lisp_t;
+
+typedef struct {
+    object_t object;
+    object_t *(*fptr) (lisp_t *, object_cons_t *);
+    int args;
+} object_function_t;
+
+lisp_t *lisp_new();
+
 sexpr_t *lisp_read(const char *, size_t);
-object_t *lisp_eval(sexpr_t *);
+object_t *lisp_eval(lisp_t *, sexpr_t *);
 const char *lisp_print(object_t *);
 
 #endif

@@ -10,13 +10,16 @@
 #include "list.h"
 
 #define DEBUG(f, args...) do { \
-    l("debug", __FILE__, __LINE__, f, ##args); } while(0);
+    logger("debug", __FILE__, __LINE__, f, ##args); } while(0);
+
+#define WARN(f, args...) do { \
+    logger("warning", __FILE__, __LINE__, f, ##args); } while(0);
 
 #define ERROR(f, args...) do { \
-    l("error", __FILE__, __LINE__, f, ##args); } while(0);
+    logger("error", __FILE__, __LINE__, f, ##args); } while(0);
 
 #define PANIC(f, args...) do { \
-    l("panic", __FILE__, __LINE__, f, ##args); \
+    logger("panic", __FILE__, __LINE__, f, ##args); \
     exit(EXIT_FAILURE); } while(0);
 
 #define BACKTRACE_MAX 100
@@ -31,7 +34,7 @@
     for (j = 0; j < nptrs; j++) printf("%s\n", strings[j]); \
     free(strings); } while(0);
 
-static int l(const char *, const char *, const int, const char *, ...);
+static int logger(const char *, const char *, const int, const char *, ...);
 
 static void *ALLOC(size_t);
 
@@ -42,8 +45,6 @@ static object_integer_t *object_integer_new(int);
 static object_string_t *object_string_new(char *, size_t);
 static object_symbol_t *object_symbol_new(char *);
 
-static object_symbol_t *symbol(char *);
-
 static object_t *read_object(lexer_t *);
 static object_string_t *read_string(lexer_token_t *);
 static object_integer_t *read_integer(lexer_token_t *);
@@ -51,8 +52,8 @@ static object_symbol_t *read_symbol(lexer_token_t *);
 
 static object_cons_t *read_list(lexer_t *);
 
-static object_t *eval_object(object_t *);
-static object_t *eval_list(object_cons_t *);
+static object_t *eval_object(lisp_t *, object_t *);
+static object_t *eval_list(lisp_t *, object_cons_t *);
 
 static const char *print_integer(object_integer_t *);
 static const char *print_string(object_string_t *);
@@ -63,11 +64,13 @@ static const char *print_cons(object_cons_t *);
 static object_cons_t *cons(object_t *, object_t *);
 static object_t *car(object_cons_t *);
 static object_t *cdr(object_cons_t *);
-static object_t *atom(object_t *);
-static object_t *eq(object_t *, object_t *);
-static object_t *cond(object_cons_t *);
+static object_t *atom(lisp_t *, object_t *);
+static object_t *eq(lisp_t *, object_t *, object_t *);
+static object_t *cond(lisp_t *, object_cons_t *);
 static object_t *first(object_cons_t *);
 static object_t *second(object_cons_t *);
+static object_t *label(lisp_t *, object_symbol_t *, object_t *);
+static object_t *assoc(lisp_t *, object_t *, object_cons_t *);
 
 //static object_t *third(object_cons_t *);
 static int list_length(object_cons_t *);
@@ -90,8 +93,8 @@ sexpr_t *lisp_read(const char *s, size_t len) {
     return sexpr;
 }
 
-object_t *lisp_eval(sexpr_t * sexpr) {
-    return eval_object(sexpr->object);
+object_t *lisp_eval(lisp_t * l, sexpr_t * sexpr) {
+    return eval_object(l, sexpr->object);
 }
 
 // Render object to string. Client must free() returned value.
@@ -190,82 +193,46 @@ static object_cons_t *read_list(lexer_t * lexer) {
     return list;
 }
 
-static object_t *C_atom(object_cons_t * args) {
-    return atom(eval_object(first(args)));
+static object_t *C_atom(lisp_t * l, object_cons_t * args) {
+    return atom(l, eval_object(l, first(args)));
 }
 
-static object_t *C_quote(object_cons_t * args) {
+static object_t *C_quote(lisp_t * l __attribute__ ((unused)),
+                         object_cons_t * args) {
+
     return first(args);
 }
 
-static object_t *C_eq(object_cons_t * args) {
-    return eq(eval_object(first(args)), eval_object(second(args)));
+static object_t *C_eq(lisp_t * l, object_cons_t * args) {
+    return eq(l, eval_object(l, first(args)), eval_object(l, second(args)));
 }
 
-static object_t *C_cond(object_cons_t * args) {
-    return cond(args);
+static object_t *C_cond(lisp_t * l, object_cons_t * args) {
+    return cond(l, args);
 }
 
-static object_t *C_cons(object_cons_t * args) {
-    return (object_t *) cons(eval_object(first(args)),
-                             eval_object(second(args)));
+static object_t *C_cons(lisp_t * l, object_cons_t * args) {
+    return (object_t *) cons(eval_object(l, first(args)),
+                             eval_object(l, second(args)));
 }
 
-static object_t *C_car(object_cons_t * args) {
-    return car((object_cons_t *) eval_object(first(args)));
+static object_t *C_car(lisp_t * l, object_cons_t * args) {
+    return car((object_cons_t *) eval_object(l, first(args)));
 }
 
-static object_t *C_cdr(object_cons_t * args) {
-    return cdr((object_cons_t *) eval_object(first(args)));
+static object_t *C_cdr(lisp_t * l, object_cons_t * args) {
+    return cdr((object_cons_t *) eval_object(l, first(args)));
 }
 
-#define ADD_FUN(s, name, fun, argc) do { \
-    object_function_t *f = object_function_new(); \
-    f->fptr = fun; f->args = argc; \
-    s = object_cons_new((object_t *) f, (object_t *) s); \
-    s = object_cons_new((object_t *) symbol(name), (object_t *) s); } while(0);
-
-static object_cons_t *make_function_symbols() {
-    object_cons_t *symbols = NULL;
-
-    ADD_FUN(symbols, "CONS", C_cons, 2);
-    ADD_FUN(symbols, "CAR", C_car, 1);
-    ADD_FUN(symbols, "CDR", C_cdr, 1);
-    ADD_FUN(symbols, "EQ", C_eq, 2);
-    ADD_FUN(symbols, "COND", C_cond, -1);
-    ADD_FUN(symbols, "QUOTE", C_quote, 1);
-    ADD_FUN(symbols, "ATOM", C_atom, 1);
-
-    return symbols;
-}
-
-static object_function_t *symbol_function(object_t * sym,
-                                          object_cons_t * symbols) {
-
-    while(symbols != NULL) {
-        if(symbols->object.type != OBJECT_CONS)
-            PANIC("invalid symbols LIST");
-
-        object_cons_t *val = (object_cons_t *) cdr(symbols);
-
-        if(eq(car(symbols), (object_t *) sym))
-            return (object_function_t *) car(val);
-
-        symbols = (object_cons_t *) cdr(val);
-    }
-
-    return NULL;
-}
-
-static object_t *eval_object(object_t * object) {
+static object_t *eval_object(lisp_t * l, object_t * object) {
     if(object == NULL)
         return NULL;
 
     switch (object->type) {
     case OBJECT_CONS:
-        return eval_list((object_cons_t *) object);
+        return eval_list(l, (object_cons_t *) object);
     case OBJECT_SYMBOL:
-        // TODO daksjldaksjd foof
+        return assoc(l, object, l->env);
     case OBJECT_STRING:
     case OBJECT_INTEGER:
         return object;
@@ -279,34 +246,55 @@ static object_t *eval_object(object_t * object) {
     exit(EXIT_FAILURE);
 }
 
-static object_t *eval_list(object_cons_t * list) {
-    if(list == NULL)
+static object_t *eval_list(lisp_t * l, object_cons_t * list) {
+    if((list == NULL) || (car(list) == NULL))
         return NULL;
 
     if(car(list) == NULL)
         PANIC("eval_list: function is NIL");
 
-    object_t *prefix = eval_object(car(list));
+    object_t *prefix = eval_object(l, car(list));
 
-    if(!atom(prefix))
-        PANIC("eval_list: prefix must be atom, not %s", print_object(prefix));
+    if(!atom(l, prefix)) {
+        PANIC("eval_list: prefix must be atom, not %s, in %s",
+              print_object(prefix), print_cons(list));
+    }
 
-    if(((object_symbol_t *) prefix)->object.type != OBJECT_SYMBOL)
-        PANIC("eval_list: expecting symbol object as first element of list");
+    if(prefix->type == OBJECT_FUNCTION) {
+        object_function_t *fun = (object_function_t *) prefix;
+
+        if((fun->args != -1) && (fun->args != (list_length(list) - 1))) {
+            PANIC("function %s takes %d arguments", print_object(prefix),
+                  fun->args);
+        }
+
+        // TODO remove args, should be in env
+        return (*fun->fptr) (l, (object_cons_t *) cdr(list));
+    }
+
+    PANIC("ARE WE DONE HERE?");
+
+    if(((object_symbol_t *) prefix)->object.type != OBJECT_SYMBOL) {
+        PANIC
+            ("eval_list: expecting symbol object as first element of list, not %s",
+             print_object((object_t *) prefix));
+    }
 
     object_symbol_t *fun_symbol = (object_symbol_t *) prefix;
-    object_function_t *fun = symbol_function(prefix, make_function_symbols());
+    object_function_t *fun = (object_function_t *) assoc(l, prefix, l->env);
 
-    if(fun == NULL)
+    if((fun == NULL) || (fun->object.type != OBJECT_FUNCTION)) {
         PANIC("eval_list: unknown function name %s in %s", fun_symbol->name,
               print_cons(list));
+    }
 
     if((fun->args != -1) && (fun->args != (list_length(list) - 1))) {
         PANIC("function %s takes %d arguments", print_object(prefix),
               fun->args);
     }
 
-    object_t *r = (*fun->fptr) ((object_cons_t *) cdr(list));
+    // TODO remove args, should be in env
+    object_t *r = (*fun->fptr) (l, (object_cons_t *) cdr(list));
 
     return r;
 }
@@ -315,15 +303,10 @@ static object_t *eval_list(object_cons_t * list) {
 ///////////////////////////////// BUILT-IN ///////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-// TODO TODO TODO - rename function, use ENVIRONMENTal lookup
-static object_symbol_t *symbol(char *t) {
-    return object_symbol_new(t);
-}
-
 // Return true if OBJECT is anything other than a CONS
-static object_t *atom(object_t * object) {
+static object_t *atom(lisp_t * l, object_t * object) {
     if((object == NULL) || (object->type != OBJECT_CONS))
-        return (object_t *) symbol("T");
+        return l->t;
 
     return NULL;
 }
@@ -359,22 +342,22 @@ static object_t *cdr(object_cons_t * cons) {
     return cons->cdr;
 }
 
-static object_t *cond(object_cons_t * list) {
-    if(list == NULL)
+static object_t *cond(lisp_t * l, object_cons_t * list) {
+    if(atom(l, (object_t *) list))
         return NULL;
 
     object_t *test = car((object_cons_t *) car(list));
     object_t *res = car((object_cons_t *) cdr((object_cons_t *) car(list)));
 
-    if(eq(eval_object(test), (object_t *) symbol("T")))
+    if(eq(l, eval_object(l, test), l->t))
         return res;
 
-    return cond((object_cons_t *) cdr(list));
+    return cond(l, (object_cons_t *) cdr(list));
 }
 
-static object_t *eq(object_t * a, object_t * b) {
+static object_t *eq(lisp_t * l, object_t * a, object_t * b) {
     if(a == b)
-        return (object_t *) symbol("T");
+        return l->t;
 
     if((a == NULL) || (b == NULL))
         return NULL;
@@ -382,10 +365,8 @@ static object_t *eq(object_t * a, object_t * b) {
     if(a->type != b->type)
         return NULL;
 
-    if(a->type == OBJECT_ERROR) {
-        PANIC("eq(%s, %s) - type is OBJECT_ERROR", print_object(a),
-              print_object(b));
-    }
+    if(a->type == OBJECT_ERROR)
+        PANIC("eq(%s, %s) - OBJECT_ERROR", print_object(a), print_object(b));
 
     if(a->type == OBJECT_CONS)
         return NULL;
@@ -393,7 +374,8 @@ static object_t *eq(object_t * a, object_t * b) {
     if(a->type == OBJECT_INTEGER) {
         if(((object_integer_t *) a)->number ==
            ((object_integer_t *) a)->number) {
-            return (object_t *) symbol("T");
+
+            return l->t;
         }
 
         return NULL;
@@ -405,7 +387,7 @@ static object_t *eq(object_t * a, object_t * b) {
                    ((object_string_t *) a)->string,
                    ((object_string_t *) a)->len)) {
 
-            return (object_t *) symbol("T");
+            return l->t;
         }
 
         return NULL;
@@ -415,7 +397,7 @@ static object_t *eq(object_t * a, object_t * b) {
         if(0 == strcmp(((object_symbol_t *) a)->name,
                        ((object_symbol_t *) b)->name)) {
 
-            return (object_t *) symbol("T");
+            return l->t;
         }
 
         return NULL;
@@ -447,6 +429,34 @@ static object_t *third(object_cons_t * list) {
     return car((object_cons_t *) cdr((object_cons_t *) cdr(list)));
 }
 #endif
+
+// TODO add test
+static object_t *assoc(lisp_t * l, object_t * x, object_cons_t * list) {
+    if(atom(l, (object_t *) list))
+        return NULL;
+
+    if(eq(l, x, car(list)))
+        return car((object_cons_t *) cdr(list));
+
+    return assoc(l, x, (object_cons_t *) cdr((object_cons_t *) cdr(list)));
+}
+
+static object_t *label(lisp_t * l, object_symbol_t * sym, object_t * obj) {
+#if 0
+    WARN("label(_, %s, %s)", print_object((object_t *) sym),
+         print_object(obj));
+#endif
+
+    if(assoc(l, (object_t *) sym, l->env)) {
+        PANIC("label(_, %s, %s) - redefinition!",
+              print_object((object_t *) sym), print_object(obj));
+    }
+
+    l->env = object_cons_new(obj, (object_t *) l->env);
+    l->env = object_cons_new((object_t *) sym, (object_t *) l->env);
+
+    return obj;
+}
 
 static int list_length(object_cons_t * list) {
     if((list == NULL) || (list->object.type != OBJECT_CONS)) {
@@ -524,7 +534,7 @@ static const char *print_cons(object_cons_t * list) {
     size_t si = 0;
 
     if((list == NULL) || (car(list) == NULL)) {
-        strcpy(s, "NIL");
+        strcpy(s, "(NIL)");
         return s;
     }
 
@@ -636,8 +646,8 @@ static void *ALLOC(const size_t sz) {
     return o;
 }
 
-static int l(const char *lvl, const char *file, const int line,
-             const char *fmt, ...) {
+static int logger(const char *lvl, const char *file, const int line,
+                  const char *fmt, ...) {
 
     va_list ap;
 
@@ -648,5 +658,31 @@ static int l(const char *lvl, const char *file, const int line,
     vsnprintf(s, len, fmt, ap);
     va_end(ap);
 
-    return fprintf(stderr, "%s[%s:%d] - %s\n", lvl, file, line, s);
+    return fprintf(stderr, "%s[%s:%03d] - %s\n", lvl, file, line, s);
+}
+
+#define ADD_FUN(l, name, fun, argc) do { \
+    object_function_t *f = object_function_new(); \
+    f->fptr = fun; f->args = argc; \
+    label(l, object_symbol_new(name), (object_t *) f); } while(0);
+
+lisp_t *lisp_new() {
+    lisp_t *l = calloc(1, sizeof(lisp_t));
+
+    l->env = NULL;
+
+    object_symbol_t *t = object_symbol_new("T");
+
+    l->t = (object_t *) t;
+    label(l, t, l->t);
+
+    ADD_FUN(l, "CONS", C_cons, 2);
+    ADD_FUN(l, "CAR", C_car, 1);
+    ADD_FUN(l, "CDR", C_cdr, 1);
+    ADD_FUN(l, "EQ", C_eq, 2);
+    ADD_FUN(l, "COND", C_cond, -1);
+    ADD_FUN(l, "QUOTE", C_quote, 1);
+    ADD_FUN(l, "ATOM", C_atom, 1);
+
+    return l;
 }

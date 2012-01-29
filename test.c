@@ -11,7 +11,9 @@
 #define ADD_TEST(t, s) do { if(NULL == CU_add_test(suite, s, t)) { \
         CU_cleanup_registry(); return CU_get_error(); } } while(0);
 
-#define ASSERT_PRINT(i, o) CU_ASSERT_STRING_EQUAL_FATAL(print(i), o);
+#define ASSERT_PRINT(i, o) do { \
+    lisp_t *l = lisp_new(); \
+    CU_ASSERT_STRING_EQUAL_FATAL(print(l, i), o); } while(0);
 
 /*****************************
  ** List suite              **
@@ -120,12 +122,12 @@ static sexpr_t *read(const char *s) {
     return sexpr;
 }
 
-static object_t *eval(const char *s) {
-    return lisp_eval(read(s));
+static object_t *eval(lisp_t * l, const char *s) {
+    return lisp_eval(l, read(s));
 }
 
-static const char *print(const char *s) {
-    const char *printed = lisp_print(eval(s));
+static const char *print(lisp_t * l, const char *s) {
+    const char *printed = lisp_print(eval(l, s));
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
     return printed;
@@ -141,14 +143,13 @@ void test_lisp_read_atom() {
 }
 
 void test_lisp_read_list() {
-    const char *s = "(a b)";
-
-    read(s);
+    read("(a b)");
 }
 
 void test_lisp_eval_atom() {
+    lisp_t *l = lisp_new();
     const char *s = "1";
-    object_t *object = eval(s);
+    object_t *object = eval(l, s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
 
@@ -157,14 +158,15 @@ void test_lisp_eval_atom() {
 }
 
 void test_lisp_eval_nil() {
-    object_t *o = lisp_eval(read("()"));
+    lisp_t *l = lisp_new();
+    object_t *o = lisp_eval(l, read("()"));
 
     CU_ASSERT_PTR_NULL_FATAL(o);
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(o), "NIL");
 }
 
 void test_lisp_print_atom_integer() {
-    CU_ASSERT_STRING_EQUAL("4", "4");
+    ASSERT_PRINT("4", "4");
 }
 
 void test_lisp_print_atom_string() {
@@ -178,7 +180,7 @@ void test_lisp_print_list_nil() {
 }
 
 void test_lisp_symbol_t() {
-    ASSERT_PRINT(print("T"), "T");
+    ASSERT_PRINT("T", "T");
 }
 
 void test_lisp_quote() {
@@ -193,6 +195,8 @@ void test_lisp_atom() {
 }
 
 void test_lisp_cons() {
+    ASSERT_PRINT("(CONS NIL NIL)", "(NIL)");
+
     ASSERT_PRINT("(CONS 1 2)", "(1 . 2)");
     ASSERT_PRINT("(CONS 2 (CONS 3 ()))", "(2 3)");
     ASSERT_PRINT("(CONS 3 (CONS 4 5))", "(3 4 . 5)");
