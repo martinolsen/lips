@@ -54,6 +54,7 @@ static object_cons_t *read_list(lexer_t *);
 
 static object_t *eval_object(lisp_t *, object_t *);
 static object_t *eval_list(lisp_t *, object_cons_t *);
+static object_t *eval_symbol(lisp_t *, object_symbol_t *);
 
 static const char *print_integer(object_integer_t *);
 static const char *print_string(object_string_t *);
@@ -224,6 +225,10 @@ static object_t *C_cdr(lisp_t * l, object_cons_t * args) {
     return cdr((object_cons_t *) eval_object(l, first(args)));
 }
 
+static object_t *C_label(lisp_t * l, object_cons_t * args) {
+    return label(l, (object_symbol_t *) first(args), second(args));
+}
+
 static object_t *eval_object(lisp_t * l, object_t * object) {
     if(object == NULL)
         return NULL;
@@ -232,7 +237,7 @@ static object_t *eval_object(lisp_t * l, object_t * object) {
     case OBJECT_CONS:
         return eval_list(l, (object_cons_t *) object);
     case OBJECT_SYMBOL:
-        return assoc(l, object, l->env);
+        return eval_symbol(l, (object_symbol_t *) object);
     case OBJECT_STRING:
     case OBJECT_INTEGER:
         return object;
@@ -244,6 +249,20 @@ static object_t *eval_object(lisp_t * l, object_t * object) {
 
     ERROR("eval_object: unhandled object %s", print_object(object));
     exit(EXIT_FAILURE);
+}
+
+static object_t *eval_symbol(lisp_t * l, object_symbol_t * sym) {
+    if(eq(l, (object_t *) sym, (object_t *) object_symbol_new("NIL")))
+        return NULL;
+
+    object_t *o = assoc(l, (object_t *) sym, l->env);
+
+    if(o == NULL) {
+        PANIC("eval_symbol[_, %s] - no such symbol in %s",
+              print_object((object_t *) sym), print_cons(l->env));
+    }
+
+    return o;
 }
 
 static object_t *eval_list(lisp_t * l, object_cons_t * list) {
@@ -259,6 +278,9 @@ static object_t *eval_list(lisp_t * l, object_cons_t * list) {
         PANIC("eval_list: prefix must be atom, not %s, in %s",
               print_object(prefix), print_cons(list));
     }
+
+    if(prefix == NULL)
+        PANIC("eval_list[_, %s] - prefix is NIL", print_cons(list));
 
     if(prefix->type == OBJECT_FUNCTION) {
         object_function_t *fun = (object_function_t *) prefix;
@@ -683,6 +705,7 @@ lisp_t *lisp_new() {
     ADD_FUN(l, "COND", C_cond, -1);
     ADD_FUN(l, "QUOTE", C_quote, 1);
     ADD_FUN(l, "ATOM", C_atom, 1);
+    ADD_FUN(l, "LABEL", C_label, 2);
 
     return l;
 }

@@ -235,6 +235,17 @@ void test_lisp_cond() {
     ASSERT_PRINT("(COND ((EQ NIL T) T))", "NIL");
 }
 
+void test_lisp_label() {
+    lisp_t *l = lisp_new();
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(l);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(eval(l, "(LABEL FOO 42)"));
+
+    object_t *foo = eval(l, "FOO");
+
+    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
+}
+
 int setup_lisp_suite() {
     CU_pSuite suite = CU_add_suite("Lisp tests", NULL, NULL);
 
@@ -258,6 +269,7 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_cdr, "lisp CDR");
     ADD_TEST(test_lisp_eq, "lisp EQ");
     ADD_TEST(test_lisp_cond, "lisp COND");
+    ADD_TEST(test_lisp_label, "lisp LABEL");
 
     return 0;
 }
