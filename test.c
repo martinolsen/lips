@@ -274,6 +274,24 @@ int setup_lisp_suite() {
     return 0;
 }
 
+void test_fun_assoc() {
+    ASSERT_PRINT("(ASSOC (QUOTE X) (QUOTE ((X A) (Y B))))", "A");
+    ASSERT_PRINT("(ASSOC (QUOTE X) (QUOTE ((X I) (X A) (Y B))))", "I");
+}
+
+int setup_fun_suite() {
+    CU_pSuite suite = CU_add_suite("Lisp functional tests", NULL, NULL);
+
+    if(NULL == suite) {
+        CU_cleanup_registry();
+        return CU_get_error();
+    }
+
+    ADD_TEST(test_fun_assoc, "ASSOC");
+
+    return 0;
+}
+
 int main() {
     if(CUE_SUCCESS != CU_initialize_registry())
         return CU_get_error();
@@ -281,6 +299,7 @@ int main() {
     setup_list_suite();
     setup_lexer_suite();
     setup_lisp_suite();
+    setup_fun_suite();
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();

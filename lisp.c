@@ -229,6 +229,12 @@ static object_t *C_label(lisp_t * l, object_cons_t * args) {
     return label(l, (object_symbol_t *) first(args), second(args));
 }
 
+static object_t *C_assoc(lisp_t * l, object_cons_t * args) {
+//static object_t *assoc(lisp_t *, object_t *, object_cons_t *);
+    return assoc(l, eval_object(l, first(args)),
+                 (object_cons_t *) eval_object(l, second(args)));
+}
+
 static object_t *eval_object(lisp_t * l, object_t * object) {
     if(object == NULL)
         return NULL;
@@ -457,10 +463,20 @@ static object_t *assoc(lisp_t * l, object_t * x, object_cons_t * list) {
     if(atom(l, (object_t *) list))
         return NULL;
 
-    if(eq(l, x, car(list)))
-        return car((object_cons_t *) cdr(list));
+#if 0
+    DEBUG("assoc[_, %s, %s]", print_object(x), print_cons(list));
+    DEBUG(" %s vs %s", print_object(x), print_object(car(list)));
+#endif
 
-    return assoc(l, x, (object_cons_t *) cdr((object_cons_t *) cdr(list)));
+    if(eq(l, x, car((object_cons_t *) car(list))))
+        return car((object_cons_t *) cdr((object_cons_t *) car(list)));
+
+    return assoc(l, x, (object_cons_t *) cdr(list));
+}
+
+static object_t *pair(object_t * k, object_t * v) {
+    return (object_t *) object_cons_new(k, (object_t *) object_cons_new(v,
+                                                                        NULL));
 }
 
 static object_t *label(lisp_t * l, object_symbol_t * sym, object_t * obj) {
@@ -474,8 +490,8 @@ static object_t *label(lisp_t * l, object_symbol_t * sym, object_t * obj) {
               print_object((object_t *) sym), print_object(obj));
     }
 
-    l->env = object_cons_new(obj, (object_t *) l->env);
-    l->env = object_cons_new((object_t *) sym, (object_t *) l->env);
+    l->env = object_cons_new(pair((object_t *) sym, obj),
+                             (object_t *) l->env);
 
     return obj;
 }
@@ -706,6 +722,8 @@ lisp_t *lisp_new() {
     ADD_FUN(l, "QUOTE", C_quote, 1);
     ADD_FUN(l, "ATOM", C_atom, 1);
     ADD_FUN(l, "LABEL", C_label, 2);
+
+    ADD_FUN(l, "ASSOC", C_assoc, 2);
 
     return l;
 }
