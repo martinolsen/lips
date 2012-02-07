@@ -157,7 +157,8 @@ static object_t *C_cdr(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
 }
 
 static object_t *C_label(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return label(l, env, (object_symbol_t *) first(args), second(args));
+    return label(l, env, (object_symbol_t *) first(args),   /* TODO eval */
+                 second(args));
 }
 
 static object_t *C_lambda(lisp_t * l
