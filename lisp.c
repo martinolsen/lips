@@ -121,61 +121,6 @@ static object_t *read_list(lexer_t * lexer) {
     return list;
 }
 
-static object_t *C_atom(lisp_t * l, lisp_env_t * env __attribute__ ((unused)),
-                        object_t * args) {
-
-    return atom(l, lisp_eval(l, env, first(args)));
-}
-
-static object_t *C_quote(lisp_t * l __attribute__ ((unused)),
-                         lisp_env_t * env __attribute__ ((unused)),
-                         object_t * args) {
-
-    return first(args);
-}
-
-static object_t *C_eq(lisp_t * l, lisp_env_t * env __attribute__ ((unused)),
-                      object_t * args) {
-
-    return eq(l, lisp_eval(l, env, first(args)),
-              lisp_eval(l, env, second(args)));
-}
-
-static object_t *C_cond(lisp_t * l, lisp_env_t * env, object_t * args) {
-    return cond(l, env, args);
-}
-
-static object_t *C_cons(lisp_t * l, lisp_env_t * env, object_t * args) {
-    return cons(lisp_eval(l, env, first(args)),
-                lisp_eval(l, env, second(args)));
-}
-
-static object_t *C_car(lisp_t * l, lisp_env_t * env, object_t * args) {
-    return car(lisp_eval(l, env, first(args)));
-}
-
-static object_t *C_cdr(lisp_t * l, lisp_env_t * env, object_t * args) {
-    return cdr(lisp_eval(l, env, first(args)));
-}
-
-static object_t *C_label(lisp_t * l, lisp_env_t * env, object_t * args) {
-    return label(l, env, first(args), /* TODO eval */ second(args));
-}
-
-static object_t *C_lambda(lisp_t * l
-                          __attribute__ ((unused)), lisp_env_t * env
-                          __attribute__ ((unused)), object_t * args) {
-
-    return lambda(first(args), second(args));
-}
-
-static object_t *C_assoc(lisp_t * l, lisp_env_t * env
-                         __attribute__ ((unused)), object_t * args) {
-
-    return assoc(l, lisp_eval(l, env, first(args)),
-                 lisp_eval(l, env, second(args)));
-}
-
 lisp_env_t *lisp_env_new(lisp_env_t * outer, object_t * labels) {
     lisp_env_t *env = calloc(1, sizeof(lisp_env_t));
 
@@ -367,16 +312,11 @@ object_t *pair(lisp_t * l, object_t * k, object_t * v) {
     object_t *head = object_cons_new(car(k), object_cons_new(car(v), NULL));
     object_t *tail = pair(l, cdr(k), cdr(v));
 
-    DEBUG(" head: %s, tail: %s", lisp_print(head), lisp_print(tail));
-
     if(car(head) == NULL)
         head = NULL;
 
     if(car(tail) == NULL)
         tail = NULL;
-
-    DEBUG(" head: %s, tail: %s", lisp_print(head), lisp_print(tail));
-    DEBUG(" pair: %s", lisp_print(object_cons_new(head, tail)));
 
     return object_cons_new(head, tail);
 }
@@ -394,12 +334,14 @@ object_t *label(lisp_t * l, lisp_env_t * env, object_t * sym, object_t * obj) {
         envi = envi->outer;
     }
 
-    if(assoc(l, (object_t *) sym, env->labels)) {
-        PANIC("label(_, %s, %s) - redefinition!",
-              lisp_print((object_t *) sym), lisp_print(obj));
-    }
-
     object_t *kv = object_cons_new(sym, object_cons_new(obj, NULL));
+
+    if(env == NULL) {
+        if(l->env == NULL)
+            PANIC("no environment!");
+
+        env = l->env;
+    }
 
     env->labels = object_cons_new(kv, env->labels);
 
@@ -531,11 +473,6 @@ int logger(const char *lvl, const char *file, const int line,
     return fprintf(stderr, "%s[%s:%03d] - %s\n", lvl, file, line, s);
 }
 
-#define ADD_FUN(l, e, name, fun, argc) do { \
-    object_function_t *f = (object_function_t*) object_function_new(); \
-    f->fptr = fun; f->args = argc; \
-    label(l, e, object_symbol_new(name), (object_t *) f); } while(0);
-
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
 
@@ -545,18 +482,6 @@ lisp_t *lisp_new() {
 
     l->t = t;
     label(l, l->env, t, l->t);
-
-    ADD_FUN(l, l->env, "CONS", C_cons, 2);
-    ADD_FUN(l, l->env, "CAR", C_car, 1);
-    ADD_FUN(l, l->env, "CDR", C_cdr, 1);
-    ADD_FUN(l, l->env, "EQ", C_eq, 2);
-    ADD_FUN(l, l->env, "COND", C_cond, -1);
-    ADD_FUN(l, l->env, "QUOTE", C_quote, 1);
-    ADD_FUN(l, l->env, "ATOM", C_atom, 1);
-    ADD_FUN(l, l->env, "LABEL", C_label, 2);
-    ADD_FUN(l, l->env, "LAMBDA", C_lambda, 2);
-
-    ADD_FUN(l, l->env, "ASSOC", C_assoc, 2);
 
     return l;
 }
