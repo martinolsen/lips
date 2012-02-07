@@ -12,12 +12,12 @@
 #include "list.h"
 
 static object_t *read_object(lexer_t *);
-static object_string_t *read_string(lexer_token_t *);
-static object_integer_t *read_integer(lexer_token_t *);
-static object_symbol_t *read_symbol(lexer_token_t *);
+static object_t *read_string(lexer_token_t *);
+static object_t *read_integer(lexer_token_t *);
+static object_t *read_symbol(lexer_token_t *);
 
 static object_t *object_new(object_type_t type);
-static object_cons_t *read_list(lexer_t *);
+static object_t *read_list(lexer_t *);
 
 object_t *lisp_read(const char *s, size_t len) {
     lexer_t *lexer = lexer_init(s, len);
@@ -34,38 +34,39 @@ static object_t *read_object(lexer_t * lexer) {
     lexer_token_t *token = lexer_expect(lexer, TOKEN_ATOM);
 
     if(token == NULL)
-        return (object_t *) read_list(lexer);
+        return read_list(lexer);
 
-    object = (object_t *) read_integer(token);
+    object = read_integer(token);
     if(object != NULL)
         return object;
 
-    object = (object_t *) read_string(token);
+    object = read_string(token);
     if(object != NULL)
         return object;
 
-    object = (object_t *) read_symbol(token);
+    object = read_symbol(token);
     if(object != NULL)
         return object;
 
     return NULL;
 }
 
-static object_symbol_t *read_symbol(lexer_token_t * token) {
+static object_t *read_symbol(lexer_token_t * token) {
     if(token->type != TOKEN_ATOM)
         return NULL;
 
-    object_symbol_t *symbol = object_symbol_new(calloc(1, token->len + 1));
+    object_symbol_t *symbol =
+        (object_symbol_t *) object_symbol_new(calloc(1, token->len + 1));
 
     if(symbol->name == NULL)
         PANIC("read_symbol: calloc");
 
     strncpy((char *restrict) symbol->name, token->text, token->len);
 
-    return symbol;
+    return (object_t *) symbol;
 }
 
-static object_string_t *read_string(lexer_token_t * token) {
+static object_t *read_string(lexer_token_t * token) {
     if((token == NULL) || (token->type != TOKEN_ATOM) || (token->len == 0))
         return NULL;
 
@@ -73,18 +74,19 @@ static object_string_t *read_string(lexer_token_t * token) {
     if((token->text[0] != '"') || (token->text[token->len] != '"'))
         return NULL;
 
-    object_string_t *o = object_string_new(calloc(token->len, sizeof(char)),
-                                           token->len - 1);
+    object_string_t *o = (object_string_t *)
+        object_string_new(calloc(token->len, sizeof(char)),
+                          token->len - 1);
 
     if(o->string == NULL)
         PANIC("read_string: calloc");
 
     strncpy((char *restrict) o->string, token->text + 1, token->len + 2);
 
-    return o;
+    return (object_t *) o;
 }
 
-static object_integer_t *read_integer(lexer_token_t * token) {
+static object_t *read_integer(lexer_token_t * token) {
     if((token == NULL) || (token->type != TOKEN_ATOM) || (token->len == 0))
         return NULL;
 
@@ -97,7 +99,7 @@ static object_integer_t *read_integer(lexer_token_t * token) {
     return object_integer_new(atoi(token->text));
 }
 
-static object_cons_t *read_list(lexer_t * lexer) {
+static object_t *read_list(lexer_t * lexer) {
     lexer_token_t *token = lexer_expect(lexer, TOKEN_LIST_START);
 
     if(token->type != TOKEN_LIST_START)
@@ -106,12 +108,12 @@ static object_cons_t *read_list(lexer_t * lexer) {
     if((token == NULL) || (lexer_expect(lexer, TOKEN_LIST_END)))
         return NULL;
 
-    object_cons_t *list = object_cons_new(NULL, NULL);
-    object_cons_t *pair = list;
+    object_t *list = object_cons_new(NULL, NULL);
+    object_cons_t *pair = (object_cons_t *) list;
 
     while(NULL == lexer_expect(lexer, TOKEN_LIST_END)) {
         pair->car = read_object(lexer);
-        pair->cdr = (object_t *) object_cons_new(NULL, NULL);
+        pair->cdr = object_cons_new(NULL, NULL);
 
         pair = (object_cons_t *) pair->cdr;
     }
@@ -120,62 +122,61 @@ static object_cons_t *read_list(lexer_t * lexer) {
 }
 
 static object_t *C_atom(lisp_t * l, lisp_env_t * env __attribute__ ((unused)),
-                        object_cons_t * args) {
+                        object_t * args) {
 
     return atom(l, lisp_eval(l, env, first(args)));
 }
 
 static object_t *C_quote(lisp_t * l __attribute__ ((unused)),
                          lisp_env_t * env __attribute__ ((unused)),
-                         object_cons_t * args) {
+                         object_t * args) {
 
     return first(args);
 }
 
 static object_t *C_eq(lisp_t * l, lisp_env_t * env __attribute__ ((unused)),
-                      object_cons_t * args) {
+                      object_t * args) {
 
     return eq(l, lisp_eval(l, env, first(args)),
               lisp_eval(l, env, second(args)));
 }
 
-static object_t *C_cond(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
+static object_t *C_cond(lisp_t * l, lisp_env_t * env, object_t * args) {
     return cond(l, env, args);
 }
 
-static object_t *C_cons(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return (object_t *) cons(lisp_eval(l, env, first(args)),
-                             lisp_eval(l, env, second(args)));
+static object_t *C_cons(lisp_t * l, lisp_env_t * env, object_t * args) {
+    return cons(lisp_eval(l, env, first(args)),
+                lisp_eval(l, env, second(args)));
 }
 
-static object_t *C_car(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return car((object_cons_t *) lisp_eval(l, env, first(args)));
+static object_t *C_car(lisp_t * l, lisp_env_t * env, object_t * args) {
+    return car(lisp_eval(l, env, first(args)));
 }
 
-static object_t *C_cdr(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return cdr((object_cons_t *) lisp_eval(l, env, first(args)));
+static object_t *C_cdr(lisp_t * l, lisp_env_t * env, object_t * args) {
+    return cdr(lisp_eval(l, env, first(args)));
 }
 
-static object_t *C_label(lisp_t * l, lisp_env_t * env, object_cons_t * args) {
-    return label(l, env, (object_symbol_t *) first(args),   /* TODO eval */
-                 second(args));
+static object_t *C_label(lisp_t * l, lisp_env_t * env, object_t * args) {
+    return label(l, env, first(args), /* TODO eval */ second(args));
 }
 
 static object_t *C_lambda(lisp_t * l
                           __attribute__ ((unused)), lisp_env_t * env
-                          __attribute__ ((unused)), object_cons_t * args) {
+                          __attribute__ ((unused)), object_t * args) {
 
-    return lambda((object_cons_t *) first(args), second(args));
+    return lambda(first(args), second(args));
 }
 
 static object_t *C_assoc(lisp_t * l, lisp_env_t * env
-                         __attribute__ ((unused)), object_cons_t * args) {
+                         __attribute__ ((unused)), object_t * args) {
 
     return assoc(l, lisp_eval(l, env, first(args)),
-                 (object_cons_t *) lisp_eval(l, env, second(args)));
+                 lisp_eval(l, env, second(args)));
 }
 
-lisp_env_t *lisp_env_new(lisp_env_t * outer, object_cons_t * labels) {
+lisp_env_t *lisp_env_new(lisp_env_t * outer, object_t * labels) {
     lisp_env_t *env = calloc(1, sizeof(lisp_env_t));
 
     env->outer = outer;
@@ -189,6 +190,7 @@ lisp_env_t *lisp_env_new(lisp_env_t * outer, object_cons_t * labels) {
 //////////////////////////////////////////////////////////////////////////////
 
 // Return true if OBJECT is anything other than a CONS
+// TODO: atom should propably take *env also
 object_t *atom(lisp_t * l, object_t * object) {
     if((object == NULL) || (object->type != OBJECT_CONS))
         return l->t;
@@ -197,46 +199,43 @@ object_t *atom(lisp_t * l, object_t * object) {
 }
 
 // apply a to list ==> (a . b)   -- b MUST be a list
-object_cons_t *cons(object_t * a, object_t * b) {
-    object_cons_t *cons = object_cons_new(a, b);
-
-    return cons;
+object_t *cons(object_t * a, object_t * b) {
+    return object_cons_new(a, b);
 }
 
-object_t *car(object_cons_t * cons) {
+object_t *car(object_t * cons) {
     if(cons == NULL)
         return NULL;
 
-    if(cons->object.type != OBJECT_CONS) {
+    if(cons->type != OBJECT_CONS) {
         PANIC("car: object is not a list: %s (%d)\n",
-              lisp_print((object_t *) cons), cons->object.type);
+              lisp_print(cons), cons->type);
     }
 
-    return cons->car;
+    return ((object_cons_t *) cons)->car;
 }
 
-object_t *cdr(object_cons_t * cons) {
+object_t *cdr(object_t * cons) {
     if(cons == NULL)
         return NULL;
 
-    if(cons->object.type != OBJECT_CONS)
-        PANIC("cdr: object is not a list: %s\n",
-              lisp_print((object_t *) cons));
+    if(cons->type != OBJECT_CONS)
+        PANIC("cdr: object is not a list: %s\n", lisp_print(cons));
 
-    return cons->cdr;
+    return ((object_cons_t *) cons)->cdr;
 }
 
-object_t *cond(lisp_t * l, lisp_env_t * env, object_cons_t * list) {
-    if(atom(l, (object_t *) list))
+object_t *cond(lisp_t * l, lisp_env_t * env, object_t * list) {
+    if(atom(l, list))
         return NULL;
 
-    object_t *test = car((object_cons_t *) car(list));
-    object_t *res = car((object_cons_t *) cdr((object_cons_t *) car(list)));
+    object_t *test = car(car(list));
+    object_t *res = car(cdr(car(list)));
 
     if(eq(l, lisp_eval(l, env, test), l->t))
         return res;
 
-    return cond(l, env, (object_cons_t *) cdr(list));
+    return cond(l, env, cdr(list));
 }
 
 object_t *eq(lisp_t * l, object_t * a, object_t * b) {
@@ -291,18 +290,18 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
     return NULL;
 }
 
-object_t *first(object_cons_t * list) {
-    if((list == NULL) || (list->object.type != OBJECT_CONS))
+object_t *first(object_t * list) {
+    if((list == NULL) || (list->type != OBJECT_CONS))
         return NULL;
 
     return car(list);
 }
 
-object_t *second(object_cons_t * list) {
+object_t *second(object_t * list) {
     if((list == NULL) || (list_length(list) < 2))
         return NULL;
 
-    return car((object_cons_t *) cdr(list));
+    return car(cdr(list));
 }
 
 #if 0
@@ -316,36 +315,41 @@ object_t *third(object_cons_t * list) {
 #endif
 
 // TODO add test
-object_t *assoc(lisp_t * l, object_t * x, object_cons_t * list) {
-    if(atom(l, (object_t *) list))
+object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
+    TRACE("assoc[_, %s, %s]", lisp_print(x), lisp_print(list));
+
+    if(o == NULL)
         return NULL;
 
-#if 0
-    DEBUG("assoc[_, %s, %s]", lisp_print(x), lisp_print((object_t *) list));
-    DEBUG(" %s vs %s", lisp_print(x), lisp_print(car(list)));
-#endif
+    if(o->type != OBJECT_CONS)
+        PANIC("assoc: expected list");
 
-    if(eq(l, x, car((object_cons_t *) car(list))))
-        return car((object_cons_t *) cdr((object_cons_t *) car(list)));
+    if(atom(l, o))
+        return NULL;
 
-    return assoc(l, x, (object_cons_t *) cdr(list));
+    if(eq(l, x, car(car(o))))
+        return car(cdr(car(o)));
+
+    return assoc(l, x, cdr(o));
 }
 
 /*
-(defun pai(x y)
+(defun pair(x y)
  (cond((and(null x) (null y)) '())
               ((and (not (atom x)) (not (atom y)))
                (cons (list (car x) (car y))
                      (pair (cdr x) (cdr y))))))
                      */
-object_cons_t *pair(lisp_t * l, object_cons_t * k, object_cons_t * v) {
+object_t *pair(lisp_t * l, object_t * k, object_t * v) {
+    TRACE("pair[%s@%p, %s@%p]", lisp_print(k), k, lisp_print(v), v);
+
     if((k == NULL) || (v == NULL))
         return NULL;
 
-    DEBUG("pair[%s@%p, %s@%p]", lisp_print((object_t *) k), k,
-          lisp_print((object_t *) v), v);
+    if((k->type != OBJECT_CONS) || (k->type != OBJECT_CONS))
+        PANIC("pair: expected cons'");
 
-    if(atom(l, (object_t *) k) || atom(l, (object_t *) v))
+    if(atom(l, k) || atom(l, v))
         return NULL;
 
 #if 0
@@ -360,14 +364,10 @@ object_cons_t *pair(lisp_t * l, object_cons_t * k, object_cons_t * v) {
 #endif
 
     // TODO - make list(object_t *...) helper
-    object_cons_t *head =
-        object_cons_new(car(k), (object_t *) object_cons_new(car(v), NULL));
+    object_t *head = object_cons_new(car(k), object_cons_new(car(v), NULL));
+    object_t *tail = pair(l, cdr(k), cdr(v));
 
-    object_cons_t *tail =
-        pair(l, (object_cons_t *) cdr(k), (object_cons_t *) cdr(v));
-
-    DEBUG(" head: %s, tail: %s", lisp_print((object_t *) head),
-          lisp_print((object_t *) tail));
+    DEBUG(" head: %s, tail: %s", lisp_print(head), lisp_print(tail));
 
     if(car(head) == NULL)
         head = NULL;
@@ -375,21 +375,14 @@ object_cons_t *pair(lisp_t * l, object_cons_t * k, object_cons_t * v) {
     if(car(tail) == NULL)
         tail = NULL;
 
-    DEBUG(" head: %s, tail: %s", lisp_print((object_t *) head),
-          lisp_print((object_t *) tail));
+    DEBUG(" head: %s, tail: %s", lisp_print(head), lisp_print(tail));
+    DEBUG(" pair: %s", lisp_print(object_cons_new(head, tail)));
 
-    DEBUG(" pair: %s", lisp_print((object_t *)
-                                  object_cons_new((object_t *) head,
-                                                  (object_t *) tail)));
-
-    return object_cons_new((object_t *) head, (object_t *) tail);
+    return object_cons_new(head, tail);
 }
 
-object_t *label(lisp_t * l, lisp_env_t * env, object_symbol_t * sym,
-                object_t * obj) {
-#if 0
-    WARN("label(_, %s, %s)", lisp_print((object_t *) sym), lisp_print(obj));
-#endif
+object_t *label(lisp_t * l, lisp_env_t * env, object_t * sym, object_t * obj) {
+    TRACE("label(_, %s, %s)", lisp_print(sym), lisp_print(obj));
 
     lisp_env_t *envi = env;
 
@@ -406,82 +399,80 @@ object_t *label(lisp_t * l, lisp_env_t * env, object_symbol_t * sym,
               lisp_print((object_t *) sym), lisp_print(obj));
     }
 
-    object_cons_t *kv = object_cons_new((object_t *) sym,
-                                        (object_t *) object_cons_new(obj,
-                                                                     NULL));
+    object_t *kv = object_cons_new(sym, object_cons_new(obj, NULL));
 
-    env->labels = object_cons_new((object_t *) kv, (object_t *) env->labels);
+    env->labels = object_cons_new(kv, env->labels);
 
     return obj;
 }
 
-object_t *lambda(object_cons_t * args, object_t * expr) {
+object_t *lambda(object_t * args, object_t * expr) {
     DEBUG("lambda[_, %s, %s]", lisp_print((object_t *) args),
           lisp_print(expr));
 
     return (object_t *) object_lambda_new(args, expr);
 }
 
-int list_length(object_cons_t * list) {
-    if((list == NULL) || (list->object.type != OBJECT_CONS)) {
+int list_length(object_t * list) {
+    if((list == NULL) || (list->type != OBJECT_CONS)) {
         ERROR("NOT A LIST, FFS!");
         return 0;
     }
 
-    object_cons_t *tail = list;
+    object_t *tail = list;
     int i = 0;
 
-    while((tail = (object_cons_t *) cdr(tail)) != NULL)
+    while((tail = cdr(tail)) != NULL)
         i++;
 
     return i;
 }
 
-object_cons_t *object_cons_new(object_t * car, object_t * cdr) {
+object_t *object_cons_new(object_t * car, object_t * cdr) {
     object_cons_t *cons = (object_cons_t *) object_new(OBJECT_CONS);
 
     cons->car = car;
     cons->cdr = cdr;
 
-    return cons;
+    return (object_t *) cons;
 }
 
-object_function_t *object_function_new(void) {
-    return (object_function_t *) object_new(OBJECT_FUNCTION);
+object_t *object_function_new(void) {
+    return (object_t *) object_new(OBJECT_FUNCTION);
 }
 
-object_lambda_t *object_lambda_new(object_cons_t * args, object_t * expr) {
+object_t *object_lambda_new(object_t * args, object_t * expr) {
 
     object_lambda_t *l = (object_lambda_t *) object_new(OBJECT_LAMBDA);
 
     l->args = args;
     l->expr = expr;
 
-    return l;
+    return (object_t *) l;
 }
 
-object_integer_t *object_integer_new(int num) {
+object_t *object_integer_new(int num) {
     object_integer_t *o = (object_integer_t *) object_new(OBJECT_INTEGER);
 
     o->number = num;
-    return o;
+    return (object_t *) o;
 }
 
-object_string_t *object_string_new(char *s, size_t n) {
+object_t *object_string_new(char *s, size_t n) {
     object_string_t *o = (object_string_t *) object_new(OBJECT_STRING);
 
     o->string = s;
     o->len = n;
 
-    return o;
+    return (object_t *) o;
 }
 
-object_symbol_t *object_symbol_new(char *s) {
+object_t *object_symbol_new(char *s) {
     object_symbol_t *o = (object_symbol_t *) object_new(OBJECT_SYMBOL);
 
     o->name = s;
 
-    return o;
+    return (object_t *) o;
 }
 
 static size_t object_sz(object_type_t type) {
@@ -541,7 +532,7 @@ int logger(const char *lvl, const char *file, const int line,
 }
 
 #define ADD_FUN(l, e, name, fun, argc) do { \
-    object_function_t *f = object_function_new(); \
+    object_function_t *f = (object_function_t*) object_function_new(); \
     f->fptr = fun; f->args = argc; \
     label(l, e, object_symbol_new(name), (object_t *) f); } while(0);
 
@@ -550,9 +541,9 @@ lisp_t *lisp_new() {
 
     l->env = lisp_env_new(NULL, NULL);
 
-    object_symbol_t *t = object_symbol_new("T");
+    object_t *t = object_symbol_new("T");
 
-    l->t = (object_t *) t;
+    l->t = t;
     label(l, l->env, t, l->t);
 
     ADD_FUN(l, l->env, "CONS", C_cons, 2);

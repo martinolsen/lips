@@ -7,6 +7,9 @@
 
 #include "list.h"
 
+#define TRACE(f, args...) do { \
+    /*logger("trace", __FILE__, __LINE__, f, ##args);*/ } while(0);
+
 #define DEBUG(f, args...) do { \
     logger("debug", __FILE__, __LINE__, f, ##args); } while(0);
 
@@ -48,31 +51,31 @@ lisp_t *lisp_new();
 
 object_t *lisp_read(const char *, size_t);
 
-object_cons_t *cons(object_t *, object_t *);
-object_t *car(object_cons_t *);
-object_t *cdr(object_cons_t *);
+object_t *cons(object_t *, object_t *);
+object_t *car(object_t *);
+object_t *cdr(object_t *);
 object_t *atom(lisp_t *, object_t *);
 object_t *eq(lisp_t *, object_t *, object_t *);
-object_t *cond(lisp_t *, lisp_env_t *, object_cons_t *);
-object_t *first(object_cons_t *);
-object_t *second(object_cons_t *);
-object_t *label(lisp_t *, lisp_env_t *, object_symbol_t *, object_t *);
-object_t *lambda(object_cons_t *, object_t *);
+object_t *cond(lisp_t *, lisp_env_t *, object_t *);
+object_t *first(object_t *);
+object_t *second(object_t *);
+object_t *label(lisp_t *, lisp_env_t *, object_t *, object_t *);
+object_t *lambda(object_t *, object_t *);
 
-object_cons_t *pair(lisp_t *, object_cons_t *, object_cons_t *);
-object_t *assoc(lisp_t *, object_t *, object_cons_t *);
+object_t *pair(lisp_t *, object_t *, object_t *);
+object_t *assoc(lisp_t *, object_t *, object_t *);
 
-//static object_t *third(object_cons_t *);
-int list_length(object_cons_t *);
+//static object_t *third(object_t *);
+int list_length(object_t *);
 
-object_cons_t *object_cons_new(object_t *, object_t *);
-object_function_t *object_function_new(void);
-object_lambda_t *object_lambda_new(object_cons_t *, object_t *);
-object_integer_t *object_integer_new(int);
-object_string_t *object_string_new(char *, size_t);
-object_symbol_t *object_symbol_new(char *);
+object_t *object_cons_new(object_t *, object_t *);
+object_t *object_function_new(void);
+object_t *object_lambda_new(object_t *, object_t *);
+object_t *object_integer_new(int);
+object_t *object_string_new(char *, size_t);
+object_t *object_symbol_new(char *);
 
-lisp_env_t *lisp_env_new(lisp_env_t *, object_cons_t *);
+lisp_env_t *lisp_env_new(lisp_env_t *, object_t *);
 
 void *ALLOC(size_t);
 
@@ -100,13 +103,13 @@ struct object_cons_t {
 
 struct object_function_t {
     object_t object;
-    object_t *(*fptr) (lisp_t *, lisp_env_t *, object_cons_t *);
+    object_t *(*fptr) (lisp_t *, lisp_env_t *, object_t *);
     int args;
 };
 
 struct object_lambda_t {
     object_t object;
-    object_cons_t *args;
+    object_t *args;
     object_t *expr;
 };
 
@@ -129,7 +132,7 @@ struct object_symbol_t {
 };
 
 struct lisp_env_t {
-    object_cons_t *labels;
+    object_t *labels;
     lisp_env_t *outer;
 };
 
