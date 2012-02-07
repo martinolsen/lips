@@ -120,8 +120,6 @@ int setup_lexer_suite() {
 static object_t *read(const char *s) {
     object_t *o = lisp_read(s, strlen(s));
 
-    CU_ASSERT_PTR_NOT_NULL_FATAL(o);
-
     return o;
 }
 
