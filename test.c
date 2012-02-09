@@ -289,6 +289,8 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_lambda, "lisp LAMBDA");
     //TODO: ADD_TEST(test_lisp_read, "lisp READ");
     ADD_TEST(test_lisp_eval, "lisp EVAL");
+    //TODO: ADD_TEST(test_lisp_read, "lisp LOOP");
+    //TODO: ADD_TEST(test_lisp_read, "lisp PRINT");
 
     return 0;
 }
