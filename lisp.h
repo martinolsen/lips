@@ -139,6 +139,7 @@ struct lisp_env_t {
 struct lisp_t {
     lisp_env_t *env;
     object_t *t;
+    object_t *nil;
 };
 
 #endif

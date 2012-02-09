@@ -38,7 +38,15 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             if(eq(l, exp, l->t))
                 return l->t;
 
-            return assoc(l, exp, env ? env->labels : l->env->labels);
+            if(eq(l, exp, l->nil))
+                return NULL;
+
+            object_t *obj = assoc(l, exp, env ? env->labels : l->env->labels);
+
+            if(obj != NULL)
+                return obj;
+
+            PANIC("undefined symbol: %s", exp);
         case OBJECT_ERROR:
         case OBJECT_CONS:
         case OBJECT_FUNCTION:
@@ -47,7 +55,6 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
         }
     }
     else if(atom(l, car(exp))) {
-        // 04: ((atom (car e))
         if(eq(l, car(exp), object_symbol_new("QUOTE"))) {
             return car(cdr(exp));
         }
@@ -74,10 +81,18 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
         else if(eq(l, car(exp), object_symbol_new("LABEL"))) {
             return label(l, env, car(cdr(exp)), car(cdr(cdr(exp))));
         }
+        else if(eq(l, car(exp), object_symbol_new("EVAL"))) {
+            return lisp_eval(l, env, lisp_eval(l, env, car(cdr(exp))));
+        }
 
-        return lisp_eval(l, env,
-                         cons(assoc(l, car(exp), env ? env->labels : NULL),
-                              cdr(exp)));
+        object_t *operator = assoc(l, car(exp), env ? env->labels : NULL);
+
+        if(operator == NULL)
+            PANIC("invalid operator %s", lisp_print(car(exp)));
+
+        object_t *tail = cdr(exp);
+
+        return lisp_eval(l, env, cons(operator, tail));
     }
     else if(eq(l, car(car(exp)), object_symbol_new("LAMBDA"))) {
         return lisp_eval(l,

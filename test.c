@@ -192,6 +192,8 @@ void test_lisp_quote() {
 
 void test_lisp_atom() {
     ASSERT_PRINT("(ATOM (QUOTE A))", "T");
+    ASSERT_PRINT("(ATOM NIL)", "T");
+    ASSERT_PRINT("(ATOM (CONS 1 2))", "NIL");
 }
 
 void test_lisp_cons() {
@@ -253,6 +255,13 @@ void test_lisp_lambda() {
          "(Z B C)");
 }
 
+void test_lisp_eval() {
+    ASSERT_PRINT("(EVAL 42)", "42");
+    ASSERT_PRINT("(EVAL (QUOTE 42))", "42");
+    ASSERT_PRINT("(EVAL (QUOTE (QUOTE 42)))", "42");
+    ASSERT_PRINT("(EVAL (QUOTE (QUOTE (QUOTE 42))))", "(QUOTE 42)");
+}
+
 int setup_lisp_suite() {
     CU_pSuite suite = CU_add_suite("Lisp tests", NULL, NULL);
 
@@ -278,6 +287,7 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_cond, "lisp COND");
     ADD_TEST(test_lisp_label, "lisp LABEL");
     ADD_TEST(test_lisp_lambda, "lisp LAMBDA");
+    ADD_TEST(test_lisp_eval, "lisp EVAL");
 
     return 0;
 }

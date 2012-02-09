@@ -478,10 +478,8 @@ lisp_t *lisp_new() {
 
     l->env = lisp_env_new(NULL, NULL);
 
-    object_t *t = object_symbol_new("T");
-
-    l->t = t;
-    label(l, l->env, t, l->t);
+    l->t = object_symbol_new("T");
+    l->nil = object_symbol_new("NIL");
 
     return l;
 }
