@@ -10,6 +10,9 @@
 #include "lisp_eval.h"
 #include "list.h"
 
+#define MAKE_SUITE(n) CU_pSuite suite = CU_add_suite(n, NULL, NULL); \
+    if(NULL == suite) { CU_cleanup_registry(); return CU_get_error(); }
+
 #define ADD_TEST(t, s) do { if(NULL == CU_add_test(suite, s, t)) { \
         CU_cleanup_registry(); return CU_get_error(); } } while(0);
 
@@ -98,12 +101,7 @@ void test_lexer_expect() {
 }
 
 int setup_lexer_suite() {
-    CU_pSuite suite = CU_add_suite("Lexer tests", NULL, NULL);
-
-    if(NULL == suite) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    MAKE_SUITE("Lexer tests");
 
     ADD_TEST(test_lexer_end, "end token");
     ADD_TEST(test_lexer_atom, "atom token");
@@ -263,12 +261,7 @@ void test_lisp_eval() {
 }
 
 int setup_lisp_suite() {
-    CU_pSuite suite = CU_add_suite("Lisp tests", NULL, NULL);
-
-    if(NULL == suite) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    MAKE_SUITE("Lisp tests");
 
     ADD_TEST(test_lisp_read_atom, "lisp read atom");
     ADD_TEST(test_lisp_read_list, "lisp read list");
@@ -301,12 +294,7 @@ void test_fun_assoc() {
 }
 
 int setup_fun_suite() {
-    CU_pSuite suite = CU_add_suite("Lisp functional tests", NULL, NULL);
-
-    if(NULL == suite) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    MAKE_SUITE("Lisp functional tests");
 
     //ADD_TEST(test_fun_assoc, "ASSOC");
 
