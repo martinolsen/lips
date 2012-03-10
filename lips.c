@@ -6,6 +6,8 @@
 #include "lisp_eval.h"
 #include "lisp_print.h"
 
+#define BUFSZ 1024
+
 struct source {
     size_t len;
     const char *text;
@@ -19,10 +21,10 @@ static struct source *read_source(void) {
         exit(EXIT_FAILURE);
     }
 
-    src->text = calloc(1024, sizeof(char));
-    src->len = 1024;
+    src->text = calloc(BUFSZ, sizeof(char));
+    src->len = BUFSZ;
 
-    fread((void *) src->text, sizeof(char), 1024, stdin);
+    fread((void *) src->text, sizeof(char), BUFSZ, stdin);
 
     return src;
 }
