@@ -81,8 +81,10 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
 
         object_t *operator = assoc(l, car(exp), env ? env->labels : NULL);
 
-        if(operator == NULL)
-            PANIC("invalid operator %s", lisp_print(car(exp)));
+        if(operator == NULL) {
+            ERROR("invalid operator %s", lisp_print(car(exp)));
+            return NULL;
+        }
 
         object_t *tail = cdr(exp);
 
