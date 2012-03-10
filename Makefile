@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic
-LDFLAGS = -lm -lao
+LDFLAGS = -lm -lao -lreadline
 
 .PHONY: run-test clean all tags
 
