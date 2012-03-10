@@ -10,6 +10,11 @@
 #include "lisp_eval.h"
 #include "list.h"
 
+#define ARG_TEST_LIST   "--only-list"
+#define ARG_TEST_LEXER  "--only-lexer"
+#define ARG_TEST_LISP   "--only-lisp"
+#define ARG_TEST_FUN    "--only-fun"
+
 #define MAKE_SUITE(n) CU_pSuite suite = CU_add_suite(n, NULL, NULL); \
     if(NULL == suite) { CU_cleanup_registry(); return CU_get_error(); }
 
@@ -301,14 +306,39 @@ int setup_fun_suite() {
     return 0;
 }
 
-int main() {
+int main(int argc, char **argv) {
+    int do_all = 1, do_list = 0, do_lexer = 0, do_lisp = 0, do_fun = 0;
+
     if(CUE_SUCCESS != CU_initialize_registry())
         return CU_get_error();
 
-    setup_list_suite();
-    setup_lexer_suite();
-    setup_lisp_suite();
-    setup_fun_suite();
+    for(int i = 0; i < argc; i++) {
+        if(0 == strncmp(argv[i], ARG_TEST_LIST, strlen(ARG_TEST_LIST))) {
+            do_list = 1;
+            do_all = 0;
+        }
+        else if(0 == strncmp(argv[i], ARG_TEST_LEXER, strlen(ARG_TEST_LEXER))) {
+            do_lexer = 1;
+            do_all = 0;
+        }
+        else if(0 == strncmp(argv[i], ARG_TEST_LISP, strlen(ARG_TEST_LISP))) {
+            do_lisp = 1;
+            do_all = 0;
+        }
+        else if(0 == strncmp(argv[i], ARG_TEST_FUN, strlen(ARG_TEST_FUN))) {
+            do_fun = 1;
+            do_all = 0;
+        }
+    }
+
+    if(do_all || do_list)
+        setup_list_suite();
+    if(do_all || do_lexer)
+        setup_lexer_suite();
+    if(do_all || do_lisp)
+        setup_lisp_suite();
+    if(do_all || do_fun)
+        setup_fun_suite();
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();

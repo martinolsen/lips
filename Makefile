@@ -10,7 +10,7 @@ tags: $(wildcard *.c) $(wildcard *.h)
 	ctags *.c
 
 run-test: all
-	./test
+	./test $(TESTFLAGS)
 
 lips: lips.o audio.o lisp_print.o lisp_eval.o lexer.o lisp.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
