@@ -109,9 +109,10 @@ static object_t *evread(void) {
     char ln[lnsz];
 
     memset(ln, 0, lnsz);
-    fgets(ln, lnsz, stdin);
+    if(fgets(ln, lnsz - 1, stdin))
+        return lisp_read(ln, strlen(ln));
 
-    return lisp_read(ln, lnsz);
+    return NULL;
 }
 
 static object_t *evprint(object_t * obj) {
