@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "lisp.h"
 #include "lisp_eval.h"
 #include "lisp_print.h"
@@ -106,6 +108,7 @@ static object_t *evread(void) {
     size_t lnsz = 128;
     char ln[lnsz];
 
+    memset(ln, 0, lnsz);
     fgets(ln, lnsz, stdin);
 
     return lisp_read(ln, lnsz);
