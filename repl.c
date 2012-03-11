@@ -9,6 +9,7 @@
 #include "lisp_print.h"
 
 #define BUFSZ 1024
+#define REPL_EXPR "(LOOP (PRINT (EVAL (READ))))"
 
 repl_t *repl_init(const char *prompt) {
     repl_t *repl = calloc(1, sizeof(repl_t));
@@ -24,24 +25,5 @@ void repl_destroy(repl_t * repl) {
 }
 
 void repl_run(repl_t * repl) {
-    int running = 1;
-
-    while(running) {
-        char *src = readline(repl->prompt);
-
-        if(src == NULL)
-            continue;
-
-        size_t len = strlen(src);
-
-        if(len == 0)
-            continue;
-
-        object_t *robj = lisp_read(src, len);
-        object_t *eobj = lisp_eval(repl->lisp, NULL, robj);
-
-        printf("res: %s\n", lisp_print(eobj));
-
-        free(src);
-    }
+    lisp_eval(repl->lisp, NULL, lisp_read(REPL_EXPR, strlen(REPL_EXPR)));
 }
