@@ -11,7 +11,7 @@ static object_t *evcond(lisp_t *, lisp_env_t *, object_t *);
 static object_t *evlis(lisp_t *, lisp_env_t *, object_t *);
 
 object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
-    DEBUG("lisp_eval(_, _, %s)", lisp_print(exp));
+    TRACE("lisp_eval(_, _, %s)", lisp_print(exp));
 
     if(exp == NULL)
         return NULL;
