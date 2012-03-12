@@ -293,6 +293,10 @@ int setup_lisp_suite() {
     return 0;
 }
 
+/*****************************
+ ** Functional suite        **
+ *****************************/
+
 void test_fun_assoc() {
     ASSERT_PRINT("(ASSOC (QUOTE X) (QUOTE ((X A) (Y B))))", "A");
     ASSERT_PRINT("(ASSOC (QUOTE X) (QUOTE ((X I) (X A) (Y B))))", "I");
@@ -301,7 +305,7 @@ void test_fun_assoc() {
 int setup_fun_suite() {
     MAKE_SUITE("Lisp functional tests");
 
-    //ADD_TEST(test_fun_assoc, "ASSOC");
+    ADD_TEST(test_fun_assoc, "ASSOC");
 
     return 0;
 }

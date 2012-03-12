@@ -235,13 +235,13 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
     return NULL;
 }
 
-/* (defun assoc. (x y)
+/* (defun assoc (x y)
  *   (cond ((eq (caar y) x) (cadar y))
- *           ('t (assoc. x (cdr y)))))
+ *           ('t (assoc x (cdr y)))))
  */
 // TODO add test
 object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
-    TRACE("assoc[_, %s, %s]", lisp_print(x), lisp_print(list));
+    TRACE("assoc[_, %s, %s]", lisp_print(x), lisp_print(o));
 
     if(o == NULL)
         return NULL;
@@ -429,6 +429,14 @@ int logger(const char *lvl, const char *file, const int line,
     return fprintf(stderr, "%s[%s:%03d] - %s\n", lvl, file, line, s);
 }
 
+/* (label assoc (lambda (x y)
+ *                (cond ((eq ((car (car y))) x) (car (cdr (car y))))
+ *                      ((quote t) (assoc x (cdr y))))))
+ */
+#define SEXP_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
+    "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
+    "      ((QUOTE T) (ASSOC (CDR Y))))))"
+
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
 
@@ -436,6 +444,11 @@ lisp_t *lisp_new() {
 
     l->t = object_symbol_new("T");
     l->nil = object_symbol_new("NIL");
+
+    // add ASSOC(x y)
+    if(NULL == lisp_eval(l, NULL, read_lisp(SEXP_ASSOC, strlen(SEXP_ASSOC)))) {
+        PANIC("lisp_new: could not create ASSOC operator");
+    }
 
     return l;
 }

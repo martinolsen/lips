@@ -81,7 +81,8 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             return evread();
         }
 
-        object_t *operator = assoc(l, car(exp), env ? env->labels : NULL);
+        object_t *operator = assoc(l, car(exp),
+                                   env ? env->labels : l->env->labels);
 
         if(operator == NULL) {
             ERROR("invalid operator %s", lisp_print(car(exp)));
