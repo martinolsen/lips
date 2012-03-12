@@ -1,3 +1,4 @@
 * VM
 * Exception handling
     * invalid operators, syntax errors, etc
+* Missing operators: AND, NOT, NULL, LIST, PAIR
