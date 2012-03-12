@@ -278,17 +278,6 @@ object_t *pair(lisp_t * l, object_t * k, object_t * v) {
     if(atom(l, k) || atom(l, v))
         return NULL;
 
-#if 0
-    object_cons_t *tail = pair(l, (object_cons_t *) cdr(k),
-                               (object_cons_t *) cdr(v));
-    object_cons_t *head = object_cons_new((object_t *) car(k),
-                                          (object_t *)
-                                          object_cons_new((object_t *) car(v),
-                                                          NULL));
-
-    return object_cons_new((object_t *) head, (object_t *) tail);
-#endif
-
     // TODO - make list(object_t *...) helper
     object_t *head = object_cons_new(car(k), object_cons_new(car(v), NULL));
     object_t *tail = pair(l, cdr(k), cdr(v));
