@@ -49,7 +49,7 @@ typedef enum object_type_t object_type_t;
 
 lisp_t *lisp_new();
 
-object_t *lisp_read(const char *, size_t);
+object_t *read_lisp(const char *, size_t);
 
 object_t *cons(object_t *, object_t *);
 object_t *car(object_t *);

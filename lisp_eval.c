@@ -110,7 +110,7 @@ static object_t *evread(void) {
 
     memset(ln, 0, lnsz);
     if(fgets(ln, lnsz - 1, stdin))
-        return lisp_read(ln, strlen(ln));
+        return read_lisp(ln, strlen(ln));
 
     return NULL;
 }

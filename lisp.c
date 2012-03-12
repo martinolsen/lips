@@ -19,7 +19,7 @@ static object_t *read_symbol(lexer_token_t *);
 static object_t *object_new(object_type_t type);
 static object_t *read_list(lexer_t *);
 
-object_t *lisp_read(const char *s, size_t len) {
+object_t *read_lisp(const char *s, size_t len) {
     lexer_t *lexer = lexer_init(s, len);
 
     if(lexer == NULL)
