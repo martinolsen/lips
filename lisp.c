@@ -259,6 +259,10 @@ object_t *third(object_cons_t * list) {
 }
 #endif
 
+/* (defun assoc. (x y)
+ *   (cond ((eq (caar y) x) (cadar y))
+ *           ('t (assoc. x (cdr y)))))
+ */
 // TODO add test
 object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
     TRACE("assoc[_, %s, %s]", lisp_print(x), lisp_print(list));
