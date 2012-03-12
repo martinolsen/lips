@@ -259,12 +259,13 @@ object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
 }
 
 /*
-(defun pair(x y)
- (cond((and(null x) (null y)) '())
-              ((and (not (atom x)) (not (atom y)))
-               (cons (list (car x) (car y))
-                     (pair (cdr x) (cdr y))))))
-                     */
+ * (defun pair(x y)
+ *   (cond ((and(null x) (null y)) '())
+ *         ((and (not (atom x)) (not (atom y)))
+ *           (cons
+ *             (list (car x) (car y))
+ *             (pair (cdr x) (cdr y))))))
+ */
 // TODO add test
 object_t *pair(lisp_t * l, object_t * k, object_t * v) {
     TRACE("pair[%s@%p, %s@%p]", lisp_print(k), k, lisp_print(v), v);
