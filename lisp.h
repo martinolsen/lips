@@ -57,15 +57,12 @@ object_t *cdr(object_t *);
 object_t *atom(lisp_t *, object_t *);
 object_t *eq(lisp_t *, object_t *, object_t *);
 object_t *cond(lisp_t *, lisp_env_t *, object_t *);
-object_t *first(object_t *);
-object_t *second(object_t *);
 object_t *label(lisp_t *, lisp_env_t *, object_t *, object_t *);
 object_t *lambda(object_t *, object_t *);
 
 object_t *pair(lisp_t *, object_t *, object_t *);
 object_t *assoc(lisp_t *, object_t *, object_t *);
 
-//static object_t *third(object_t *);
 int list_length(object_t *);
 
 object_t *object_cons_new(object_t *, object_t *);

@@ -235,30 +235,6 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
     return NULL;
 }
 
-object_t *first(object_t * list) {
-    if((list == NULL) || (list->type != OBJECT_CONS))
-        return NULL;
-
-    return car(list);
-}
-
-object_t *second(object_t * list) {
-    if((list == NULL) || (list_length(list) < 2))
-        return NULL;
-
-    return car(cdr(list));
-}
-
-#if 0
-object_t *third(object_cons_t * list) {
-  if((list == NULL) || (list_length(list) < 3) iindent: Standard input: 600: Warning: Unterminated character constant indent: Standard input: 599: Warning: Unterminated character constant indent: Standard input: 598: Warning: Unterminated character constant indent: Standard input: 597: Warning: Unterminated character constant indent: Standard input: 596: Warning: Unterminated character constant indent: Standard input: 595: Warning: Unterminated character constant indent: Standard input: 594: Warning: Unterminated character constant indent: Standard input: 593: Warning: Unterminated character constant indent: Standard input: 592: Warning: Unterminated character constant indent: Standard input: 591: Warning: Unterminated character constant indent: Standard input: 588: Warning: Unterminated character constant indent: Standard input: 587: Warning: Unterminated character constant indent: Standard input: 586: Warning: Unterminated character constant indent: Standard input: 585: Warning: Unterminated character constant indent: Standard input: 584: Warning: Unterminated character constant indent: Standard input: 583: Warning: Unterminated character constant indent: Standard input: 582: Warning: Unterminated character constant indent: Standard input: 581: Warning: Unterminated character constant indent: Standard input: 580: Warning: Unterminated character constant indent: Standard input: 579: Warning: Unterminated character constant indent: Standard input: 578: Warning: Unterminated character constant indent: Standard input: 577: Warning: Unterminated character constant indent: Standard input: 576: Warning: Unterminated character constant indent: Standard input: 575: Warning: Unterminated character constant indent: Standard input: 574: Warning: Unterminated character constant indent: Standard input: 573: Warning: Unterminated character constant indent: Standard input: 572: Warning: Unterminated character constant indent: Standard input: 571: Warning: Unterminated character constant indent: Standard input: 570: Warning: Unterminated character constant indent: Standard input: 569: Warning: Unterminated character constant indent: Standard input: 568: Warning: Unterminated character constant indent: Standard input: 567: Warning: Unterminated character constant indent: Standard input: 566: Warning: Unterminated character constant indent: Standard input: 565: Warning: Unterminated character constant indent: Standard input: 564: Warning: Unterminated character constant indent: Standard input: 563: Warning: Unterminated character constant indent: Standard input: 562: Warning: Unterminated character constant indent: Standard input: 561: Warning: Unterminated character constant indent: Standard input: 559: Warning: Unterminated character constant ndent: Standard input: 557: Warning:Unterminated character
-       constant)
-        return NULL;
-
-    return car((object_cons_t *) cdr((object_cons_t *) cdr(list)));
-}
-#endif
-
 /* (defun assoc. (x y)
  *   (cond ((eq (caar y) x) (cadar y))
  *           ('t (assoc. x (cdr y)))))
