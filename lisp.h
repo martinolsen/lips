@@ -63,8 +63,6 @@ object_t *lambda(object_t *, object_t *);
 object_t *pair(lisp_t *, object_t *, object_t *);
 object_t *assoc(lisp_t *, object_t *, object_t *);
 
-int list_length(object_t *);
-
 object_t *object_cons_new(object_t *, object_t *);
 object_t *object_function_new(void);
 object_t *object_lambda_new(object_t *, object_t *);

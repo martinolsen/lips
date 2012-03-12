@@ -265,6 +265,7 @@ object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
                (cons (list (car x) (car y))
                      (pair (cdr x) (cdr y))))))
                      */
+// TODO add test
 object_t *pair(lisp_t * l, object_t * k, object_t * v) {
     TRACE("pair[%s@%p, %s@%p]", lisp_print(k), k, lisp_print(v), v);
 
@@ -333,21 +334,6 @@ object_t *lambda(object_t * args, object_t * expr) {
           lisp_print(expr));
 
     return (object_t *) object_lambda_new(args, expr);
-}
-
-int list_length(object_t * list) {
-    if((list == NULL) || (list->type != OBJECT_CONS)) {
-        ERROR("NOT A LIST, FFS!");
-        return 0;
-    }
-
-    object_t *tail = list;
-    int i = 0;
-
-    while((tail = cdr(tail)) != NULL)
-        i++;
-
-    return i;
 }
 
 object_t *object_cons_new(object_t * car, object_t * cdr) {
