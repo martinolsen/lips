@@ -433,9 +433,15 @@ int logger(const char *lvl, const char *file, const int line,
  *                (cond ((eq ((car (car y))) x) (car (cdr (car y))))
  *                      ((quote t) (assoc x (cdr y))))))
  */
-#define SEXP_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
+#define SEXPR_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
     "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
     "      ((QUOTE T) (ASSOC (CDR Y))))))"
+
+static void add_builtin(lisp_t * l, const char *name, const char *sexpr) {
+    if(NULL == lisp_eval(l, NULL, read_lisp(sexpr, strlen(sexpr)))) {
+        PANIC("lisp_new: could not create %s operator", name);
+    }
+}
 
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
@@ -445,10 +451,7 @@ lisp_t *lisp_new() {
     l->t = object_symbol_new("T");
     l->nil = object_symbol_new("NIL");
 
-    // add ASSOC(x y)
-    if(NULL == lisp_eval(l, NULL, read_lisp(SEXP_ASSOC, strlen(SEXP_ASSOC)))) {
-        PANIC("lisp_new: could not create ASSOC operator");
-    }
+    add_builtin(l, "ASSOC", SEXPR_ASSOC);
 
     return l;
 }
