@@ -251,6 +251,18 @@ void test_lisp_label() {
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
 }
 
+void test_lisp_obj_lambda() {
+    lisp_t *lisp = lisp_new();
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(lisp);
+
+    object_t *l = eval(lisp, "(LAMBDA (X) (CONS X NIL))");
+
+    CU_ASSERT_EQUAL_FATAL(l->type, OBJECT_LAMBDA);
+
+    // TODO lisp_destroy(lisp);
+}
+
 void test_lisp_lambda() {
     ASSERT_PRINT("((LAMBDA (X) (CONS X (QUOTE (B)))) (QUOTE A))", "(A B)");
     ASSERT_PRINT
@@ -270,11 +282,16 @@ int setup_lisp_suite() {
 
     ADD_TEST(test_lisp_read_atom, "lisp read atom");
     ADD_TEST(test_lisp_read_list, "lisp read list");
+
     ADD_TEST(test_lisp_eval_atom, "lisp eval atom");
     ADD_TEST(test_lisp_eval_nil, "lisp eval ()");
+
     ADD_TEST(test_lisp_print_atom_integer, "lisp print atom integer");
     ADD_TEST(test_lisp_print_atom_string, "lisp print atom string");
     ADD_TEST(test_lisp_print_list_nil, "lisp print ()");
+
+    ADD_TEST(test_lisp_obj_lambda, "lisp object LAMBDA");
+
     ADD_TEST(test_lisp_symbol_t, "lisp symbol T");
     ADD_TEST(test_lisp_atom, "lisp ATOM");
     ADD_TEST(test_lisp_quote, "lisp QUOTE");
