@@ -315,8 +315,8 @@ int setup_lisp_suite() {
  *****************************/
 
 void test_fun_assoc() {
-    ASSERT_PRINT("(ASSOC (QUOTE X) (QUOTE ((X A) (Y B))))", "A");
-    ASSERT_PRINT("(ASSOC (QUOTE X) (QUOTE ((X I) (X A) (Y B))))", "I");
+    ASSERT_PRINT("(ASSOC (QUOTE A) (QUOTE ((A 1) (B 2))))", "1");
+    ASSERT_PRINT("(ASSOC (QUOTE A) (QUOTE ((A 1) (A 0) (B 2))))", "1");
 }
 
 int setup_fun_suite() {

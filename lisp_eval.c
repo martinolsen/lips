@@ -63,6 +63,9 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             return cons(lisp_eval(l, env, car(cdr(exp))),
                         lisp_eval(l, env, car(cdr(cdr(exp)))));
         }
+        else if(eq(l, car(exp), object_symbol_new("LAMBDA"))) {
+            return lambda(car(cdr(exp)), car(cdr(cdr(exp))));
+        }
         else if(eq(l, car(exp), object_symbol_new("COND"))) {
             return evcond(l, env, cdr(exp));
         }
@@ -83,6 +86,20 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             return evread();
         }
 
+        if(car(exp)->type == OBJECT_LAMBDA) {
+            object_lambda_t *lamb = (object_lambda_t *) car(exp);
+
+            // TODO validate args agains argdef
+
+            /* Pair argument names to input, create env */
+            object_t *args = cdr(exp);
+            object_t *env_pair = pair(l, lamb->args, evlis(l, env, args));
+            lisp_env_t *lenv = lisp_env_new(env, env_pair);
+
+            return lisp_eval(l, lenv, lamb->expr);
+        }
+
+        /* operator is not one of the builtins, see if it is defined in env */
         object_t *operator = assoc(l, car(exp),
                                    env ? env->labels : l->env->labels);
 
