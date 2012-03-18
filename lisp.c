@@ -12,6 +12,7 @@
 #include "list.h"
 
 static object_t *read_object(lexer_t *);
+static object_t *read_quote(lexer_t *, lexer_token_t *);
 static object_t *read_string(lexer_token_t *);
 static object_t *read_integer(lexer_token_t *);
 static object_t *read_symbol(lexer_token_t *);
@@ -38,6 +39,10 @@ static object_t *read_object(lexer_t * lexer) {
     if(token == NULL)
         return read_list(lexer);
 
+    object = read_quote(lexer, token);
+    if(object != NULL)
+        return object;
+
     object = read_integer(token);
     if(object != NULL)
         return object;
@@ -51,6 +56,17 @@ static object_t *read_object(lexer_t * lexer) {
         return object;
 
     return NULL;
+}
+
+static object_t *read_quote(lexer_t * lexer, lexer_token_t * token) {
+    if(token->type != TOKEN_ATOM)
+        return NULL;
+
+    if((token->len != 1) || (token->text[0] != '\''))
+        return NULL;
+
+    return object_cons_new(object_symbol_new("QUOTE"),
+                           object_cons_new(read_object(lexer), NULL));
 }
 
 static object_t *read_symbol(lexer_token_t * token) {
@@ -104,7 +120,7 @@ static object_t *read_integer(lexer_token_t * token) {
 static object_t *read_list(lexer_t * lexer) {
     lexer_token_t *token = lexer_expect(lexer, TOKEN_LIST_START);
 
-    if(token->type != TOKEN_LIST_START)
+    if((token == NULL) || (token->type != TOKEN_LIST_START))
         PANIC("read_list - no TOKEN_LIST_START!");
 
     if((token == NULL) || (lexer_expect(lexer, TOKEN_LIST_END)))
@@ -458,11 +474,11 @@ int logger(const char *lvl, const char *file, const int line,
 
 /* (label assoc (lambda (x y)
  *                (cond ((eq (car (car y)) x) (car (cdr (car y))))
- *                      ((quote t) (assoc x (cdr y))))))
+ *                      ('t (assoc x (cdr y))))))
  */
 #define SEXPR_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
     "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
-    "      ((QUOTE T) (ASSOC X (CDR Y))))))"
+    "      ('T (ASSOC X (CDR Y))))))"
 
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));

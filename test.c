@@ -10,10 +10,11 @@
 #include "lisp_eval.h"
 #include "list.h"
 
-#define ARG_TEST_LIST   "--only-list"
-#define ARG_TEST_LEXER  "--only-lexer"
-#define ARG_TEST_LISP   "--only-lisp"
-#define ARG_TEST_FUN    "--only-fun"
+#define ARG_TEST_LIST       "--only-list"
+#define ARG_TEST_LEXER      "--only-lexer"
+#define ARG_TEST_LISP_READ  "--only-lisp-read"
+#define ARG_TEST_LISP       "--only-lisp"
+#define ARG_TEST_FUN        "--only-fun"
 
 #define MAKE_SUITE(n) CU_pSuite suite = CU_add_suite(n, NULL, NULL); \
     if(NULL == suite) { CU_cleanup_registry(); return CU_get_error(); }
@@ -23,7 +24,47 @@
 
 #define ASSERT_PRINT(i, o) do { \
     lisp_t *l = lisp_new(); \
+    if(strcmp(print(l, i), o)) \
+        fprintf(stderr, "expected »%s«, got »%s«\n", o, print(l, i)); \
     CU_ASSERT_STRING_EQUAL_FATAL(print(l, i), o); } while(0);
+
+/*****************************
+ ** Helper functions        **
+ *****************************/
+
+/** Read an s-expression.
+ *
+ *  If l is NULL, a temporary lisp_t will be created.
+ */
+static object_t *read(lisp_t * l, const char *s) {
+    lisp_t *lisp = l;
+
+    if(l == NULL)
+        lisp = lisp_new();
+
+    object_t *o = lisp_read(lisp, s, strlen(s));
+
+    return o;
+}
+
+/** Evaluate an s-expression.
+ *
+ *  Uses read().
+ */
+static object_t *eval(lisp_t * l, const char *s) {
+    return lisp_eval(l, NULL, read(l, s));
+}
+
+/** Print the result of an evaluated s-expression to a string.
+ *
+ *  Asserts that evaluation succeedes.
+ */
+static const char *print(lisp_t * l, const char *s) {
+    const char *printed = lisp_print(eval(l, s));
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
+    return printed;
+}
 
 /*****************************
  ** List suite              **
@@ -117,30 +158,8 @@ int setup_lexer_suite() {
 }
 
 /*****************************
- ** Lisp suite              **
+ ** Lisp reader suite       **
  *****************************/
-
-static object_t *read(lisp_t * l, const char *s) {
-    lisp_t *lisp = l;
-
-    if(l == NULL)
-        lisp = lisp_new();
-
-    object_t *o = lisp_read(lisp, s, strlen(s));
-
-    return o;
-}
-
-static object_t *eval(lisp_t * l, const char *s) {
-    return lisp_eval(l, NULL, read(l, s));
-}
-
-static const char *print(lisp_t * l, const char *s) {
-    const char *printed = lisp_print(eval(l, s));
-
-    CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
-    return printed;
-}
 
 void test_lisp_read_atom() {
     const char *s = "1";
@@ -153,6 +172,28 @@ void test_lisp_read_atom() {
 void test_lisp_read_list() {
     read(NULL, "(a b)");
 }
+
+void test_lisp_read_macro_quote() {
+    ASSERT_PRINT("'A", "A");
+    ASSERT_PRINT("'42", "42");
+    ASSERT_PRINT("'()", "NIL");
+    ASSERT_PRINT("'(A)", "(A)");
+}
+
+int setup_lisp_read_suite() {
+    MAKE_SUITE("Lisp reader tests");
+
+    ADD_TEST(test_lisp_read_atom, "lisp read atom");
+    ADD_TEST(test_lisp_read_list, "lisp read list");
+
+    ADD_TEST(test_lisp_read_macro_quote, "lisp read macro quote");
+
+    return 0;
+}
+
+/*****************************
+ ** Lisp suite              **
+ *****************************/
 
 void test_lisp_eval_atom() {
     lisp_t *l = lisp_new();
@@ -199,7 +240,7 @@ void test_lisp_quote() {
 }
 
 void test_lisp_atom() {
-    ASSERT_PRINT("(ATOM (QUOTE A))", "T");
+    ASSERT_PRINT("(ATOM 'A)", "T");
     ASSERT_PRINT("(ATOM NIL)", "T");
     ASSERT_PRINT("(ATOM (CONS 1 2))", "NIL");
 }
@@ -229,10 +270,10 @@ void test_lisp_cdr() {
 }
 
 void test_lisp_eq() {
-    ASSERT_PRINT("(EQ (QUOTE A) (QUOTE B))", "NIL");
-    ASSERT_PRINT("(EQ (QUOTE A) (QUOTE A))", "T");
-    ASSERT_PRINT("(EQ (QUOTE (A B)) (QUOTE (A B)))", "NIL");
-    ASSERT_PRINT("(EQ (QUOTE ()) (QUOTE ()))", "T");
+    ASSERT_PRINT("(EQ 'A 'B)", "NIL");
+    ASSERT_PRINT("(EQ 'A 'A)", "T");
+    ASSERT_PRINT("(EQ '(A B) '(A B))", "NIL");
+    ASSERT_PRINT("(EQ '() '())", "T");
     ASSERT_PRINT("(EQ () ())", "T");
     ASSERT_PRINT("(EQ (CONS 1 NIL) (CONS 1 NIL))", "NIL");
 }
@@ -269,10 +310,8 @@ void test_lisp_obj_lambda() {
 }
 
 void test_lisp_lambda() {
-    ASSERT_PRINT("((LAMBDA (X) (CONS X (QUOTE (B)))) (QUOTE A))", "(A B)");
-    ASSERT_PRINT
-        ("((LAMBDA (X Y) (CONS X (CDR Y))) (QUOTE Z) (QUOTE (A B C)))",
-         "(Z B C)");
+    ASSERT_PRINT("((LAMBDA (X) (CONS X 'B)) 'A)", "(A . B)");
+    ASSERT_PRINT("((LAMBDA (X Y) (CONS X (CDR Y))) 'Z '(A B C))", "(Z B C)");
 }
 
 void test_lisp_macro() {
@@ -290,16 +329,13 @@ void test_lisp_macro() {
 
 void test_lisp_eval() {
     ASSERT_PRINT("(EVAL 42)", "42");
-    ASSERT_PRINT("(EVAL (QUOTE 42))", "42");
-    ASSERT_PRINT("(EVAL (QUOTE (QUOTE 42)))", "42");
-    ASSERT_PRINT("(EVAL (QUOTE (QUOTE (QUOTE 42))))", "(QUOTE 42)");
+    ASSERT_PRINT("(EVAL '42)", "42");
+    ASSERT_PRINT("(EVAL ''42)", "42");
+    ASSERT_PRINT("(EVAL '''42)", "(QUOTE 42)");
 }
 
 int setup_lisp_suite() {
     MAKE_SUITE("Lisp tests");
-
-    ADD_TEST(test_lisp_read_atom, "lisp read atom");
-    ADD_TEST(test_lisp_read_list, "lisp read list");
 
     ADD_TEST(test_lisp_eval_atom, "lisp eval atom");
     ADD_TEST(test_lisp_eval_nil, "lisp eval ()");
@@ -334,9 +370,9 @@ int setup_lisp_suite() {
  *****************************/
 
 void test_fun_assoc() {
-    ASSERT_PRINT("(ASSOC (QUOTE A) (QUOTE ((A 1) (B 2))))", "1");
-    ASSERT_PRINT("(ASSOC (QUOTE A) (QUOTE ((A 1) (A 0) (B 2))))", "1");
-    ASSERT_PRINT("(ASSOC (QUOTE B) (QUOTE ((A 1) (B 2) (C 3))))", "2");
+    ASSERT_PRINT("(ASSOC 'A '((A 1) (B 2)))", "1");
+    ASSERT_PRINT("(ASSOC 'A '((A 1) (A 0) (B 2)))", "1");
+    ASSERT_PRINT("(ASSOC 'B '((A 1) (B 2) (C 3)))", "2");
 }
 
 int setup_fun_suite() {
@@ -348,7 +384,8 @@ int setup_fun_suite() {
 }
 
 int main(int argc, char **argv) {
-    int do_all = 1, do_list = 0, do_lexer = 0, do_lisp = 0, do_fun = 0;
+    int do_all = 1;
+    int do_list = 0, do_lexer = 0, do_lisp_read = 0, do_lisp = 0, do_fun = 0;
 
     if(CUE_SUCCESS != CU_initialize_registry())
         return CU_get_error();
@@ -360,6 +397,12 @@ int main(int argc, char **argv) {
         }
         else if(0 == strncmp(argv[i], ARG_TEST_LEXER, strlen(ARG_TEST_LEXER))) {
             do_lexer = 1;
+            do_all = 0;
+        }
+        else if(0 ==
+                strncmp(argv[i], ARG_TEST_LISP_READ,
+                        strlen(ARG_TEST_LISP_READ))) {
+            do_lisp_read = 1;
             do_all = 0;
         }
         else if(0 == strncmp(argv[i], ARG_TEST_LISP, strlen(ARG_TEST_LISP))) {
@@ -376,6 +419,8 @@ int main(int argc, char **argv) {
         setup_list_suite();
     if(do_all || do_lexer)
         setup_lexer_suite();
+    if(do_all || do_lisp_read)
+        setup_lisp_read_suite();
     if(do_all || do_lisp)
         setup_lisp_suite();
     if(do_all || do_fun)

@@ -85,6 +85,14 @@ static lexer_token_t *lexer_peek(lexer_t * lexer) {
         return token;
     }
 
+    if(accept(lexer, "\'")) {
+        token->type = TOKEN_ATOM;
+        token->text = "\'";
+        token->len = 1;
+
+        return token;
+    }
+
     if(accept(lexer, "\"")) {
         token->type = TOKEN_ATOM;
         token->text = lexer->text + lexer->pos - 1;
