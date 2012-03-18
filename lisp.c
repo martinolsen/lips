@@ -457,12 +457,12 @@ int logger(const char *lvl, const char *file, const int line,
     } while(0);
 
 /* (label assoc (lambda (x y)
- *                (cond ((eq ((car (car y))) x) (car (cdr (car y))))
+ *                (cond ((eq (car (car y)) x) (car (cdr (car y))))
  *                      ((quote t) (assoc x (cdr y))))))
  */
 #define SEXPR_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
     "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
-    "      ((QUOTE T) (ASSOC (CDR Y))))))"
+    "      ((QUOTE T) (ASSOC X (CDR Y))))))"
 
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
