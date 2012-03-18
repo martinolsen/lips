@@ -120,14 +120,19 @@ int setup_lexer_suite() {
  ** Lisp suite              **
  *****************************/
 
-static object_t *read(const char *s) {
-    object_t *o = read_lisp(s, strlen(s));
+static object_t *read(lisp_t * l, const char *s) {
+    lisp_t *lisp = l;
+
+    if(l == NULL)
+        lisp = lisp_new();
+
+    object_t *o = lisp_read(lisp, s, strlen(s));
 
     return o;
 }
 
 static object_t *eval(lisp_t * l, const char *s) {
-    return lisp_eval(l, NULL, read(s));
+    return lisp_eval(l, NULL, read(l, s));
 }
 
 static const char *print(lisp_t * l, const char *s) {
@@ -139,14 +144,14 @@ static const char *print(lisp_t * l, const char *s) {
 
 void test_lisp_read_atom() {
     const char *s = "1";
-    object_t *o = read(s);
+    object_t *o = read(NULL, s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(o);
     CU_ASSERT_EQUAL_FATAL(o->type, OBJECT_INTEGER);
 }
 
 void test_lisp_read_list() {
-    read("(a b)");
+    read(NULL, "(a b)");
 }
 
 void test_lisp_eval_atom() {
@@ -162,7 +167,7 @@ void test_lisp_eval_atom() {
 
 void test_lisp_eval_nil() {
     lisp_t *l = lisp_new();
-    object_t *o = lisp_eval(l, NULL, read("()"));
+    object_t *o = eval(l, "()");
 
     CU_ASSERT_PTR_NULL_FATAL(o);
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(o), "NIL");
@@ -270,6 +275,19 @@ void test_lisp_lambda() {
          "(Z B C)");
 }
 
+void test_lisp_macro() {
+    const char *foo_sexpr = "(LABEL FOO (MACRO (A) (CONS 13 (CONS A NIL))))";
+    lisp_t *l = lisp_new();
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(l);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(eval(l, foo_sexpr));
+
+    object_t *r = eval(l, "(FOO 42)");
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(r);
+    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(13 42)");
+}
+
 void test_lisp_eval() {
     ASSERT_PRINT("(EVAL 42)", "42");
     ASSERT_PRINT("(EVAL (QUOTE 42))", "42");
@@ -302,6 +320,7 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_cond, "lisp COND");
     ADD_TEST(test_lisp_label, "lisp LABEL");
     ADD_TEST(test_lisp_lambda, "lisp LAMBDA");
+    ADD_TEST(test_lisp_macro, "lisp MACRO");
     //TODO: ADD_TEST(test_lisp_read, "lisp READ");
     ADD_TEST(test_lisp_eval, "lisp EVAL");
     //TODO: ADD_TEST(test_lisp_read, "lisp LOOP");

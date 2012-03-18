@@ -19,13 +19,15 @@ static object_t *read_symbol(lexer_token_t *);
 static object_t *object_new(object_type_t type);
 static object_t *read_list(lexer_t *);
 
-object_t *read_lisp(const char *s, size_t len) {
+static object_t *expand(lisp_t *, object_t *);
+
+object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
     lexer_t *lexer = lexer_init(s, len);
 
     if(lexer == NULL)
         return NULL;
 
-    return read_object(lexer);
+    return expand(lisp, read_object(lexer));
 }
 
 static object_t *read_object(lexer_t * lexer) {
@@ -326,6 +328,13 @@ object_t *lambda(object_t * args, object_t * expr) {
     return (object_t *) object_lambda_new(args, expr);
 }
 
+object_t *macro(object_t * args, object_t * expr) {
+    TRACE("macro[_, %s, %s]", lisp_print((object_t *) args),
+          lisp_print(expr));
+
+    return (object_t *) object_macro_new(args, expr);
+}
+
 object_t *object_cons_new(object_t * car, object_t * cdr) {
     object_cons_t *cons = (object_cons_t *) object_new(OBJECT_CONS);
 
@@ -342,6 +351,16 @@ object_t *object_function_new(void) {
 object_t *object_lambda_new(object_t * args, object_t * expr) {
 
     object_lambda_t *l = (object_lambda_t *) object_new(OBJECT_LAMBDA);
+
+    l->args = args;
+    l->expr = expr;
+
+    return (object_t *) l;
+}
+
+object_t *object_macro_new(object_t * args, object_t * expr) {
+
+    object_macro_t *l = (object_macro_t *) object_new(OBJECT_MACRO);
 
     l->args = args;
     l->expr = expr;
@@ -381,6 +400,8 @@ static size_t object_sz(object_type_t type) {
         return sizeof(object_function_t);
     case OBJECT_LAMBDA:
         return sizeof(object_lambda_t);
+    case OBJECT_MACRO:
+        return sizeof(object_macro_t);
     case OBJECT_INTEGER:
         return sizeof(object_integer_t);
     case OBJECT_STRING:
@@ -429,11 +450,17 @@ int logger(const char *lvl, const char *file, const int line,
     return fprintf(stderr, "%s[%s:%03d] - %s\n", lvl, file, line, s);
 }
 
+#define MAKE_BUILTIN(lisp, name, sexpr) do { \
+    object_t *obj = lisp_read(lisp, sexpr, strlen(sexpr)); \
+    if(NULL == lisp_eval(lisp, NULL, obj)) \
+        PANIC("lisp_new: could not create %s operator", name); \
+    } while(0);
+
 /* (label assoc (lambda (x y)
  *                (cond ((eq ((car (car y))) x) (car (cdr (car y))))
  *                      ((quote t) (assoc x (cdr y))))))
  */
-#define SEXP_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
+#define SEXPR_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
     "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
     "      ((QUOTE T) (ASSOC (CDR Y))))))"
 
@@ -446,11 +473,20 @@ lisp_t *lisp_new() {
     l->nil = object_symbol_new("NIL");
 
     // add ASSOC(x y)
-    if(NULL == lisp_eval(l, NULL, read_lisp(SEXP_ASSOC, strlen(SEXP_ASSOC)))) {
-        PANIC("lisp_new: could not create ASSOC operator");
-    }
+    MAKE_BUILTIN(l, "ASSOC", SEXPR_ASSOC);
 
     return l;
+}
+
+/** Expand macros in object_t
+ *
+ * TODO:
+ *  * should macro expansion really happen before the reader returns?
+ */
+static object_t *expand(lisp_t * l, object_t * o) {
+    l = l;
+
+    return o;
 }
 
 /* TODO:
