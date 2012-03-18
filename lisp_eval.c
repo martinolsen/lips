@@ -10,6 +10,7 @@ static object_t *evloop(lisp_t *, lisp_env_t *, object_t *);
 static object_t *evcond(lisp_t *, lisp_env_t *, object_t *);
 static object_t *evlis(lisp_t *, lisp_env_t *, object_t *);
 
+/** Evaluate a LISP form.  */
 object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
     TRACE("lisp_eval(_, _, %s)", lisp_print(exp));
 
@@ -66,7 +67,8 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             return evcond(l, env, cdr(exp));
         }
         else if(eq(l, car(exp), object_symbol_new("LABEL"))) {
-            return label(l, env, car(cdr(exp)), car(cdr(cdr(exp))));
+            return label(l, env, car(cdr(exp)),
+                         lisp_eval(l, env, car(cdr(cdr(exp)))));
         }
         else if(eq(l, car(exp), object_symbol_new("EVAL"))) {
             return lisp_eval(l, env, lisp_eval(l, env, car(cdr(exp))));
