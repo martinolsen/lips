@@ -116,11 +116,14 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
         }
 
         /* operator is not one of the builtins, see if it is defined in env */
-        object_t *operator = assoc(l, car(exp),
-                                   env ? env->labels : l->env->labels);
+        // TODO please come up with something smarter than a split environment
+        object_t *operator = assoc(l, car(exp), env ? env->labels : NULL);
+
+        if(operator == NULL)
+            operator = assoc(l, car(exp), l->env->labels);
 
         if(operator == NULL) {
-            ERROR("invalid operator %s", lisp_print(car(exp)));
+            ERROR("invalid operator: %s", lisp_print(car(exp)));
             return NULL;
         }
 
