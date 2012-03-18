@@ -320,7 +320,7 @@ object_t *label(lisp_t * l, lisp_env_t * env, object_t * sym, object_t * obj) {
 }
 
 object_t *lambda(object_t * args, object_t * expr) {
-    DEBUG("lambda[_, %s, %s]", lisp_print((object_t *) args),
+    TRACE("lambda[_, %s, %s]", lisp_print((object_t *) args),
           lisp_print(expr));
 
     return (object_t *) object_lambda_new(args, expr);
