@@ -456,7 +456,7 @@ int logger(const char *lvl, const char *file, const int line,
 
     va_list ap;
 
-    const size_t len = 256;
+    const size_t len = 1024;
     char *s = calloc(len, sizeof(char));
 
     va_start(ap, fmt);
