@@ -4,14 +4,15 @@
 #include "lisp_eval.h"
 #include "lisp_print.h"
 
-static object_t *evread(void);
+static object_t *evread(lisp_t *);
 static object_t *evprint(object_t *);
 static object_t *evloop(lisp_t *, lisp_env_t *, object_t *);
 static object_t *evcond(lisp_t *, lisp_env_t *, object_t *);
 static object_t *evlis(lisp_t *, lisp_env_t *, object_t *);
 
+/** Evaluate a LISP form.  */
 object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
-    TRACE("lisp_eval(_, _, %s)", lisp_print(exp));
+    TRACE("lisp_eval[_, _, %s]", lisp_print(exp));
 
     if(exp == NULL)
         return NULL;
@@ -38,6 +39,7 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
         case OBJECT_CONS:
         case OBJECT_FUNCTION:
         case OBJECT_LAMBDA:
+        case OBJECT_MACRO:
             PANIC("lisp_eval: something is wrong: %d", exp->type);
         }
     }
@@ -62,11 +64,18 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             return cons(lisp_eval(l, env, car(cdr(exp))),
                         lisp_eval(l, env, car(cdr(cdr(exp)))));
         }
+        else if(eq(l, car(exp), object_symbol_new("LAMBDA"))) {
+            return lambda(car(cdr(exp)), car(cdr(cdr(exp))));
+        }
+        else if(eq(l, car(exp), object_symbol_new("MACRO"))) {
+            return macro(car(cdr(exp)), car(cdr(cdr(exp))));
+        }
         else if(eq(l, car(exp), object_symbol_new("COND"))) {
             return evcond(l, env, cdr(exp));
         }
         else if(eq(l, car(exp), object_symbol_new("LABEL"))) {
-            return label(l, env, car(cdr(exp)), car(cdr(cdr(exp))));
+            return label(l, env, car(cdr(exp)),
+                         lisp_eval(l, env, car(cdr(cdr(exp)))));
         }
         else if(eq(l, car(exp), object_symbol_new("EVAL"))) {
             return lisp_eval(l, env, lisp_eval(l, env, car(cdr(exp))));
@@ -78,14 +87,43 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             return evloop(l, env, car(cdr(exp)));
         }
         else if(eq(l, car(exp), object_symbol_new("READ"))) {
-            return evread();
+            return evread(l);
         }
 
-        object_t *operator = assoc(l, car(exp),
-                                   env ? env->labels : l->env->labels);
+        if(car(exp)->type == OBJECT_LAMBDA) {
+            object_lambda_t *lamb = (object_lambda_t *) car(exp);
+
+            // TODO validate args agains argdef
+
+            /* Pair argument names to input, create env */
+            object_t *args = cdr(exp);
+            object_t *env_pair = pair(l, lamb->args, evlis(l, env, args));
+            lisp_env_t *lenv = lisp_env_new(env, env_pair);
+
+            return lisp_eval(l, lenv, lamb->expr);
+        }
+        else if(car(exp)->type == OBJECT_MACRO) {
+            object_macro_t *m = (object_macro_t *) car(exp);
+
+            // TODO validate args against argdef
+
+            /* Pair argument names to input, create env */
+            object_t *args = cdr(exp);
+            object_t *env_pair = pair(l, m->args, evlis(l, env, args));
+            lisp_env_t *lenv = lisp_env_new(env, env_pair);
+
+            return lisp_eval(l, lenv, m->expr);
+        }
+
+        /* operator is not one of the builtins, see if it is defined in env */
+        // TODO please come up with something smarter than a split environment
+        object_t *operator = assoc(l, car(exp), env ? env->labels : NULL);
+
+        if(operator == NULL)
+            operator = assoc(l, car(exp), l->env->labels);
 
         if(operator == NULL) {
-            ERROR("invalid operator %s", lisp_print(car(exp)));
+            ERROR("invalid operator: %s", lisp_print(car(exp)));
             return NULL;
         }
 
@@ -105,13 +143,13 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
 }
 
 // TODO mother fsck'er!
-static object_t *evread(void) {
+static object_t *evread(lisp_t * l) {
     size_t lnsz = 128;
     char ln[lnsz];
 
     memset(ln, 0, lnsz);
     if(fgets(ln, lnsz - 1, stdin))
-        return read_lisp(ln, strlen(ln));
+        return lisp_read(l, ln, strlen(ln));
 
     return NULL;
 }

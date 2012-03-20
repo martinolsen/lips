@@ -29,6 +29,8 @@ static const char *print_object(object_t * o) {
         return print_integer(o);
     case OBJECT_LAMBDA:
         return "#<Lambda>";     // TODO
+    case OBJECT_MACRO:
+        return "#<Macro>";      // TODO
     case OBJECT_FUNCTION:
         return "#<Function>";   // TODO
     case OBJECT_STRING:

@@ -41,6 +41,7 @@ typedef struct object_t object_t;
 typedef struct object_cons_t object_cons_t;
 typedef struct object_function_t object_function_t;
 typedef struct object_lambda_t object_lambda_t;
+typedef struct object_macro_t object_macro_t;
 typedef struct object_integer_t object_integer_t;
 typedef struct object_string_t object_string_t;
 typedef struct object_symbol_t object_symbol_t;
@@ -49,7 +50,7 @@ typedef enum object_type_t object_type_t;
 
 lisp_t *lisp_new();
 
-object_t *read_lisp(const char *, size_t);
+object_t *lisp_read(lisp_t *, const char *, size_t);
 
 object_t *cons(object_t *, object_t *);
 object_t *car(object_t *);
@@ -59,6 +60,7 @@ object_t *eq(lisp_t *, object_t *, object_t *);
 object_t *cond(lisp_t *, lisp_env_t *, object_t *);
 object_t *label(lisp_t *, lisp_env_t *, object_t *, object_t *);
 object_t *lambda(object_t *, object_t *);
+object_t *macro(object_t *, object_t *);
 
 object_t *pair(lisp_t *, object_t *, object_t *);
 object_t *assoc(lisp_t *, object_t *, object_t *);
@@ -66,6 +68,7 @@ object_t *assoc(lisp_t *, object_t *, object_t *);
 object_t *object_cons_new(object_t *, object_t *);
 object_t *object_function_new(void);
 object_t *object_lambda_new(object_t *, object_t *);
+object_t *object_macro_new(object_t *, object_t *);
 object_t *object_integer_new(int);
 object_t *object_string_new(char *, size_t);
 object_t *object_symbol_new(char *);
@@ -81,6 +84,7 @@ enum object_type_t {
     OBJECT_CONS,
     OBJECT_FUNCTION,
     OBJECT_LAMBDA,
+    OBJECT_MACRO,
     OBJECT_INTEGER,
     OBJECT_STRING,
     OBJECT_SYMBOL,
@@ -103,6 +107,12 @@ struct object_function_t {
 };
 
 struct object_lambda_t {
+    object_t object;
+    object_t *args;
+    object_t *expr;
+};
+
+struct object_macro_t {
     object_t object;
     object_t *args;
     object_t *expr;
