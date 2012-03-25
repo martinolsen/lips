@@ -24,9 +24,9 @@
 
 #define ASSERT_PRINT(i, o) do { \
     lisp_t *l = lisp_new(); \
-    if(strcmp(print(l, i), o)) \
-        fprintf(stderr, "expected »%s«, got »%s«\n", o, print(l, i)); \
-    CU_ASSERT_STRING_EQUAL_FATAL(print(l, i), o); } while(0);
+    if(strcmp(tprint(l, i), o)) \
+        fprintf(stderr, "expected »%s«, got »%s«\n", o, tprint(l, i)); \
+    CU_ASSERT_STRING_EQUAL_FATAL(tprint(l, i), o); } while(0);
 
 /*****************************
  ** Helper functions        **
@@ -36,7 +36,7 @@
  *
  *  If l is NULL, a temporary lisp_t will be created.
  */
-static object_t *read(lisp_t * l, const char *s) {
+static object_t *tread(lisp_t * l, const char *s) {
     lisp_t *lisp = l;
 
     if(l == NULL)
@@ -49,18 +49,18 @@ static object_t *read(lisp_t * l, const char *s) {
 
 /** Evaluate an s-expression.
  *
- *  Uses read().
+ *  Uses tread().
  */
-static object_t *eval(lisp_t * l, const char *s) {
-    return lisp_eval(l, NULL, read(l, s));
+static object_t *teval(lisp_t * l, const char *s) {
+    return lisp_eval(l, NULL, tread(l, s));
 }
 
 /** Print the result of an evaluated s-expression to a string.
  *
  *  Asserts that evaluation succeedes.
  */
-static const char *print(lisp_t * l, const char *s) {
-    const char *printed = lisp_print(eval(l, s));
+static const char *tprint(lisp_t * l, const char *s) {
+    const char *printed = lisp_print(teval(l, s));
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
     return printed;
@@ -158,19 +158,35 @@ int setup_lexer_suite() {
 }
 
 /*****************************
+ ** Stream suite            **
+ *****************************/
+
+void test_lisp_stream_simple() {
+    // TODO
+}
+
+int setup_lisp_stream_suite() {
+    MAKE_SUITE("Lisp stream tests");
+
+    ADD_TEST(test_lisp_stream_simple, "Simple stream");
+
+    return 0;
+}
+
+/*****************************
  ** Lisp reader suite       **
  *****************************/
 
 void test_lisp_read_atom() {
     const char *s = "1";
-    object_t *o = read(NULL, s);
+    object_t *o = tread(NULL, s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(o);
     CU_ASSERT_EQUAL_FATAL(o->type, OBJECT_INTEGER);
 }
 
 void test_lisp_read_list() {
-    read(NULL, "(a b)");
+    tread(NULL, "(a b)");
 }
 
 void test_lisp_read_macro_quote() {
@@ -198,7 +214,7 @@ int setup_lisp_read_suite() {
 void test_lisp_eval_atom() {
     lisp_t *l = lisp_new();
     const char *s = "1";
-    object_t *object = eval(l, s);
+    object_t *object = teval(l, s);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(object);
 
@@ -208,7 +224,7 @@ void test_lisp_eval_atom() {
 
 void test_lisp_eval_nil() {
     lisp_t *l = lisp_new();
-    object_t *o = eval(l, "()");
+    object_t *o = teval(l, "()");
 
     CU_ASSERT_PTR_NULL_FATAL(o);
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(o), "NIL");
@@ -290,9 +306,9 @@ void test_lisp_label() {
     lisp_t *l = lisp_new();
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(l);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(eval(l, "(LABEL FOO 42)"));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(teval(l, "(LABEL FOO 42)"));
 
-    object_t *foo = eval(l, "FOO");
+    object_t *foo = teval(l, "FOO");
 
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
 }
@@ -302,7 +318,7 @@ void test_lisp_obj_lambda() {
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(lisp);
 
-    object_t *l = eval(lisp, "(LAMBDA (X) (CONS X NIL))");
+    object_t *l = teval(lisp, "(LAMBDA (X) (CONS X NIL))");
 
     CU_ASSERT_EQUAL_FATAL(l->type, OBJECT_LAMBDA);
 
@@ -319,9 +335,9 @@ void test_lisp_macro() {
     lisp_t *l = lisp_new();
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(l);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(eval(l, foo_sexpr));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(teval(l, foo_sexpr));
 
-    object_t *r = eval(l, "(FOO 42)");
+    object_t *r = teval(l, "(FOO 42)");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(r);
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(13 42)");
@@ -414,6 +430,9 @@ int main(int argc, char **argv) {
             do_all = 0;
         }
     }
+
+    // TODO add param
+    setup_lisp_stream_suite();
 
     if(do_all || do_list)
         setup_list_suite();

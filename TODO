@@ -2,3 +2,7 @@
 * Exception handling
     * invalid operators, syntax errors, etc
 * Missing operators: AND, NOT, NULL, LIST, PAIR
+* Refactoring
+  * split out object_t functions
+* Memory management
+  * possibly using environments - see 'let'

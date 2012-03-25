@@ -37,6 +37,8 @@ static const char *print_object(object_t * o) {
         return print_string(o);
     case OBJECT_SYMBOL:
         return ((object_symbol_t *) o)->name;
+    case OBJECT_STREAM:
+        return ((object_stream_t *) o)->buf;
     }
 
     PANIC("print_object: unknwon object of type #%d", o->type);
@@ -80,7 +82,7 @@ static const char *print_integer(object_t * o) {
 }
 
 static const char *print_cons(object_t * list) {
-    const size_t len = 255;
+    const size_t len = 1024;
     char *s = ALLOC(len * sizeof(char) + 1);
     size_t si = snprintf(s, len, "(");
 
@@ -102,7 +104,7 @@ static const char *print_cons(object_t * list) {
         si += snprintf(s + si, len - si, "%s%s", prefix, print_object(obj));
 
         if(si > len)
-            PANIC("print_cons[..] - string overflow");
+            PANIC("print_cons[..] - string overflow (got: »%s«)", s);
 
         if(list->type == OBJECT_CONS)
             list = cdr(list);

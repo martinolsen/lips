@@ -11,25 +11,26 @@
 #include "lexer.h"
 #include "list.h"
 
+static object_t *expand(lisp_t *, object_t *);
+
+object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
+    DEBUG("lisp_read[_, %s, %d]", s, len);
+
+    object_t *stream = object_stream_new(s, len);
+    object_t *o = read(lisp, stream);
+
+    DEBUG(" lisp_read: %s", lisp_print(o));
+
+    return expand(lisp, o);
+}
+
+#if 0
 static object_t *read_object(lexer_t *);
 static object_t *read_quote(lexer_t *, lexer_token_t *);
 static object_t *read_string(lexer_token_t *);
 static object_t *read_integer(lexer_token_t *);
 static object_t *read_symbol(lexer_token_t *);
-
-static object_t *object_new(object_type_t type);
 static object_t *read_list(lexer_t *);
-
-static object_t *expand(lisp_t *, object_t *);
-
-object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
-    lexer_t *lexer = lexer_init(s, len);
-
-    if(lexer == NULL)
-        return NULL;
-
-    return expand(lisp, read_object(lexer));
-}
 
 static object_t *read_object(lexer_t * lexer) {
     object_t *object;
@@ -138,6 +139,7 @@ static object_t *read_list(lexer_t * lexer) {
 
     return list;
 }
+#endif
 
 lisp_env_t *lisp_env_new(lisp_env_t * outer, object_t * labels) {
     lisp_env_t *env = calloc(1, sizeof(lisp_env_t));
@@ -161,7 +163,7 @@ object_t *atom(lisp_t * l, object_t * object) {
     return NULL;
 }
 
-// apply a to list ==> (a . b)   -- b MUST be a list
+/** Construct cons object with car a and cdr b. */
 object_t *cons(object_t * a, object_t * b) {
     return object_cons_new(a, b);
 }
@@ -253,9 +255,18 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
     return NULL;
 }
 
-/* (defun assoc (x y)
- *   (cond ((eq (caar y) x) (cadar y))
- *           ('t (assoc x (cdr y)))))
+/** Associate symbol x with value in plist y.
+ *
+ * Lisp definition:
+ *
+ *   (defun assoc (x y)
+ *     (cond ((eq (caar y) x) (cadar y))
+ *             ('t (assoc x (cdr y)))))
+ *
+ * Example:
+ *
+ *   (assoc 'b '((a 1) (b 2) (c 3)))
+ *   2
  */
 // TODO add test
 object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
@@ -276,13 +287,21 @@ object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
     return assoc(l, x, cdr(o));
 }
 
-/*
- * (defun pair(x y)
- *   (cond ((and(null x) (null y)) '())
- *         ((and (not (atom x)) (not (atom y)))
- *           (cons
- *             (list (car x) (car y))
- *             (pair (cdr x) (cdr y))))))
+/** Construct plist from list of keys x and list of values y.
+ *
+ *  Lisp definition:
+ *
+ *    (defun pair(x y)
+ *      (cond ((and (null x) (null y)) nil)
+ *            ((and (not (atom x)) (not (atom y)))
+ *              (cons
+ *                (list (car x) (car y))
+ *                (pair (cdr x) (cdr y))))))
+ *
+ *  Example:
+ *
+ *    (pair '(a b c) '(1 2 3))
+ *    ((a 1) (b 2) (c 3))
  */
 // TODO add test
 object_t *pair(lisp_t * l, object_t * k, object_t * v) {
@@ -337,6 +356,7 @@ object_t *label(lisp_t * l, lisp_env_t * env, object_t * sym, object_t * obj) {
     return obj;
 }
 
+/** Construct a lambda object from an s-expression. */
 object_t *lambda(object_t * args, object_t * expr) {
     TRACE("lambda[_, %s, %s]", lisp_print((object_t *) args),
           lisp_print(expr));
@@ -344,11 +364,249 @@ object_t *lambda(object_t * args, object_t * expr) {
     return (object_t *) object_lambda_new(args, expr);
 }
 
+/** Construct a macro object from an s-expression. */
 object_t *macro(object_t * args, object_t * expr) {
     TRACE("macro[_, %s, %s]", lisp_print((object_t *) args),
           lisp_print(expr));
 
     return (object_t *) object_macro_new(args, expr);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+////////////////////////////// STREAMS & READERS /////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+static int stream_is_eof(object_t * o) {
+    if(!object_isa(o, OBJECT_STREAM))
+        return 1;
+
+    object_stream_t *s = (object_stream_t *) o;
+
+    if(s->buf_idx >= s->buf_sz)
+        return 1;
+
+    return 0;
+}
+
+static char stream_read_char(object_t * o) {
+    if(!object_isa(o, OBJECT_STREAM))
+        return EOF;
+
+    if(stream_is_eof(o))
+        return EOF;
+
+    object_stream_t *s = (object_stream_t *) o;
+
+    return s->buf[s->buf_idx++];
+}
+
+static void stream_unread_char(object_t * o, char x) {
+    if(!object_isa(o, OBJECT_STREAM))
+        PANIC("cannot unread char to non-stream object");
+
+    object_stream_t *s = (object_stream_t *) o;
+
+    if(s->buf_idx == 0)
+        PANIC("unreading beyond beginning of stream not supported");
+
+    s->buf[--s->buf_idx] = x;
+}
+
+/** Read list of objects from input-stream. */
+static object_t *mread_list(lisp_t * l, char x, object_t * stream) {
+    if(x != '(')
+        PANIC("mread_list cannot read non-list");
+
+    object_t *o = read(l, stream);
+
+    if(o == NULL)
+        return NULL;
+
+    object_t *list = cons(o, NULL);
+    object_t *tail = NULL;
+
+    while((o = read(l, stream))) {
+        DEBUG(" got token: %s", lisp_print(o));
+
+        if(tail == NULL) {
+            tail = ((object_cons_t *) list)->cdr = cons(o, NULL);
+        }
+        else {
+            ((object_cons_t *) tail)->cdr = cons(o, NULL);
+        }
+    }
+
+    return list;
+}
+
+/** Read s-expression from stream.
+ *
+ *  read()'s algorithm is based on that described in
+ *  http://www.franz.com/support/documentation/6.2/ansicl/section/readeral.htm
+ *
+ *  TODO:
+ *    * Check if function really is reentrant.
+ */
+object_t *read(lisp_t * l, object_t * stream) {
+    char x;
+
+    do {
+        /* 1. If at end of file, end-of-file processing is performed as specified
+         * in read.
+         */
+
+        // if EOF, exit -- TODO not conforming to above spec
+        if(stream_is_eof(stream))
+            return NULL;
+
+        /* 2. If x is an invalid character, an error of type reader-error is
+         * signaled.
+         */
+
+        // TODO if invalid character, signal read-error
+
+        x = stream_read_char(stream);
+
+        /* 3. If x is a whitespace2 character, then it is discarded and step 1 is
+         * re-entered.
+         */
+    } while((x == ' ') || (x == '\t') || (x == '\n'));
+
+    DEBUG("read[_, %c]", x);
+
+    /* 4. If x is a terminating or non-terminating macro character then its
+     * associated reader macro function is called with two arguments, the
+     * input stream and x.
+     */
+
+    if(x == '(') {
+        DEBUG(" calling list macro reader");
+
+        return mread_list(l, x, stream);
+    }
+    else if(x == ')') {
+        return NULL;
+    }
+    else if(x == '"') {
+        PANIC("cannot read strings...");
+    }
+    else if(x == '\'') {
+        DEBUG(" reading quote");
+
+        object_t *o = read(l, stream);
+
+        return cons(object_symbol_new("QUOTE"), cons(o, NULL));
+    }
+
+    /* 5. If x is a single escape character then the next character, y, is
+     * read, or an error of type end-of-file is signaled if at the end of
+     * file.
+     */
+
+    // TODO check for escape character
+
+    /* 6. If x is a multiple escape character then a token (initially
+     * containing no characters) is begun and step 9 is entered.
+     */
+
+    // TODO
+
+    /* 7. If x is a constituent character, then it begins a token. After the
+     * token is read in, it will be interpreted either as a Lisp object or as
+     * being of invalid syntax.
+     */
+
+    // TODO
+    static size_t token_sz = 256;
+    size_t token_idx = 0;
+    char token[token_sz];
+
+    memset(token, 0, token_sz);
+
+    token[token_idx++] = x;
+
+    while(!stream_is_eof(stream)) {
+        if(token_idx > token_sz)
+            PANIC("token overflow");
+
+        x = stream_read_char(stream);
+
+        if((x == ' ') || (x == ')')) {  // teminating characters
+            stream_unread_char(stream, x);
+            break;
+        }
+
+        token[token_idx++] = x;
+    };
+
+    /* 8. At this point a token is being accumulated, and an even number of
+     * multiple escape characters have been encountered.
+     */
+
+    // TODO
+
+    /* 9. At this point a token is being accumulated, and an odd number of
+     * multiple escape characters have been encountered.
+     */
+
+    // TODO
+
+    /* 10. An entire token has been accumulated. */
+
+    if(token_idx == 0) {
+        WARN("read: token too short: %s", token);
+        return NULL;
+    }
+
+    DEBUG(" read token:  »%s«", token);
+
+    // create number object, if possible
+    for(size_t i = 0; (token_idx > i) && isdigit(token[i]); i++) {
+        DEBUG("  %c", token[i]);
+
+        if(i == token_idx - 1)
+            return object_integer_new(atoi(token));
+    }
+
+    return object_symbol_new(token);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// OBJECTS ////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+static size_t object_sz(object_type_t type) {
+    switch (type) {
+    case OBJECT_CONS:
+        return sizeof(object_cons_t);
+    case OBJECT_FUNCTION:
+        return sizeof(object_function_t);
+    case OBJECT_LAMBDA:
+        return sizeof(object_lambda_t);
+    case OBJECT_MACRO:
+        return sizeof(object_macro_t);
+    case OBJECT_INTEGER:
+        return sizeof(object_integer_t);
+    case OBJECT_STRING:
+        return sizeof(object_string_t);
+    case OBJECT_SYMBOL:
+        return sizeof(object_symbol_t);
+    case OBJECT_STREAM:
+        return sizeof(object_stream_t);
+    case OBJECT_ERROR:
+        PANIC("object_new: unknwon error");
+    }
+
+    ERROR("object_new: unknown type");
+    exit(EXIT_FAILURE);
+}
+
+static object_t *object_new(object_type_t type) {
+    object_t *object = ALLOC(object_sz(type));
+
+    object->type = type;
+
+    return object;
 }
 
 object_t *object_cons_new(object_t * car, object_t * cdr) {
@@ -402,42 +660,35 @@ object_t *object_string_new(char *s, size_t n) {
 
 object_t *object_symbol_new(char *s) {
     object_symbol_t *o = (object_symbol_t *) object_new(OBJECT_SYMBOL);
+    size_t sz = strlen(s);
 
-    o->name = s;
+    o->name = ALLOC(sz);
+
+    memcpy((char *) o->name, s, sz);
 
     return (object_t *) o;
 }
 
-static size_t object_sz(object_type_t type) {
-    switch (type) {
-    case OBJECT_CONS:
-        return sizeof(object_cons_t);
-    case OBJECT_FUNCTION:
-        return sizeof(object_function_t);
-    case OBJECT_LAMBDA:
-        return sizeof(object_lambda_t);
-    case OBJECT_MACRO:
-        return sizeof(object_macro_t);
-    case OBJECT_INTEGER:
-        return sizeof(object_integer_t);
-    case OBJECT_STRING:
-        return sizeof(object_string_t);
-    case OBJECT_SYMBOL:
-        return sizeof(object_symbol_t);
-    case OBJECT_ERROR:
-        PANIC("object_new: unknwon error");
-    }
+object_t *object_stream_new(const char *buf, size_t sz) {
+    object_stream_t *o = (object_stream_t *) object_new(OBJECT_STREAM);
 
-    ERROR("object_new: unknown type");
-    exit(EXIT_FAILURE);
+    o->buf = ALLOC(sz);
+    o->buf_sz = sz;
+    o->buf_idx = 0;
+
+    memcpy(o->buf, buf, sz);
+
+    return (object_t *) o;
 }
 
-static object_t *object_new(object_type_t type) {
-    object_t *object = ALLOC(object_sz(type));
+int object_isa(object_t * o, object_type_t t) {
+    if(o == NULL)
+        return 0;
 
-    object->type = type;
+    if(o->type != t)
+        return 0;
 
-    return object;
+    return 1;
 }
 
 void *ALLOC(const size_t sz) {
@@ -493,6 +744,19 @@ lisp_t *lisp_new() {
 
     return l;
 }
+
+#if 0
+/** Construct a stream (cons') of input stream. */
+static object_t *stream_string(const char *s, size_t len) {
+    if((s == NULL) || (len == 0) || (*s == 0))
+        return NULL;
+
+    object_t *c = object_integer_new(*s);
+    object_t *t = stream_string(s + 1, len - 1);
+
+    return object_cons_new(c, t);
+}
+#endif
 
 /** Expand macros in object_t
  *
