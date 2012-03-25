@@ -664,19 +664,6 @@ lisp_t *lisp_new() {
     return l;
 }
 
-#if 0
-/** Construct a stream (cons') of input stream. */
-static object_t *stream_string(const char *s, size_t len) {
-    if((s == NULL) || (len == 0) || (*s == 0))
-        return NULL;
-
-    object_t *c = object_integer_new(*s);
-    object_t *t = stream_string(s + 1, len - 1);
-
-    return object_cons_new(c, t);
-}
-#endif
-
 /** Expand macros in object_t
  *
  * TODO:
