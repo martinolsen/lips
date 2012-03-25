@@ -348,6 +348,67 @@ static object_t *mread_quote(lisp_t * l, char x, object_t * stream) {
     return cons(object_symbol_new("QUOTE"), cons(read(l, stream), NULL));
 }
 
+static object_t *mread_unquote(lisp_t * l, char x, object_t * stream) {
+    if(x != ',')
+        PANIC("mread_unquote cannot read non-unquote");
+
+    return cons(object_symbol_new("UNQUOTE"), cons(read(l, stream), NULL));
+}
+
+static object_t *mread_backquote(lisp_t * l, char x, object_t * stream) {
+    DEBUG("mread_backquote[_, _, _]");
+
+    if(x != '`')
+        PANIC("mread_backquote cannot read non-backquote");
+
+    // register a temporary backquote-escape macro reader
+    object_t *old_readtable = l->readtable;
+    object_t *entry =
+        cons(object_symbol_new(","), (object_t *) mread_unquote);
+    l->readtable = cons(entry, l->readtable);
+
+    // read elements
+    object_t *list = NULL, *tail = NULL;
+    object_t *elems = read(l, stream);
+
+    while(elems) {
+        object_t *o = NULL;
+
+        DEBUG(" elems: »%s«", lisp_print(elems));
+        DEBUG(" list:  »%s«", lisp_print(list));
+
+        if(atom(l, car(elems))) {
+            o = cons(object_symbol_new("QUOTE"), cons(car(elems), NULL));
+        }
+        else if(eq(l, car(car(elems)), object_symbol_new("UNQUOTE"))) {
+            o = car(cdr(car(elems)));
+        }
+        else {
+            PANIC("mread_backquote is confused by »%s«", lisp_print(elems));
+        }
+
+        DEBUG(" o:     »%s«", lisp_print(o));
+
+        if(list == NULL) {
+            list = cons(o, NULL);
+        }
+        else if(tail == NULL) {
+            tail = ((object_cons_t *) list)->cdr = cons(o, NULL);
+        }
+        else {
+            ((object_cons_t *) tail)->cdr = cons(o, NULL);
+        }
+
+        elems = cdr(elems);
+    }
+
+    l->readtable = old_readtable;
+
+    DEBUG(" backquoted list: »%s«", lisp_print(list));
+
+    return list;
+}
+
 /** Read s-expression from stream.
  *
  *  read()'s algorithm is based on that described in
@@ -484,6 +545,9 @@ static object_t *readtable_new(void) {
     readtable = cons(entry, readtable);
 
     entry = cons(object_symbol_new("\'"), (object_t *) mread_quote);
+    readtable = cons(entry, readtable);
+
+    entry = cons(object_symbol_new("`"), (object_t *) mread_backquote);
     readtable = cons(entry, readtable);
 
     return readtable;
@@ -641,13 +705,22 @@ int logger(const char *lvl, const char *file, const int line,
         PANIC("lisp_new: could not create %s operator", name); \
     } while(0);
 
+#define SEXPR_DEFUN "(LABEL DEFUN (MACRO (NAME ARGS BODY)" \
+    "`(LABEL ,NAME ,ARGS ,BODY)))"
+
 /* (label assoc (lambda (x y)
  *                (cond ((eq (car (car y)) x) (car (cdr (car y))))
  *                      ('t (assoc x (cdr y))))))
  */
+#if 0
 #define SEXPR_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
     "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
     "      ('T (ASSOC X (CDR Y))))))"
+#else
+#define SEXPR_ASSOC "(DEFUN ASSOC (X Y)" \
+    "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
+    "      ('T (ASSOC X (CDR Y)))))"
+#endif
 
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
@@ -658,8 +731,10 @@ lisp_t *lisp_new() {
     l->t = object_symbol_new("T");
     l->nil = object_symbol_new("NIL");
 
-    // add ASSOC(x y)
+    MAKE_BUILTIN(l, "DEFUN", SEXPR_DEFUN);
     MAKE_BUILTIN(l, "ASSOC", SEXPR_ASSOC);
+
+    DEBUG("created initial lisp environment");
 
     return l;
 }

@@ -12,7 +12,7 @@ static object_t *evlis(lisp_t *, lisp_env_t *, object_t *);
 
 /** Evaluate a LISP form.  */
 object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
-    TRACE("lisp_eval[_, _, %s]", lisp_print(exp));
+    DEBUG("lisp_eval[_, _, %s]", lisp_print(exp));
 
     if(exp == NULL)
         return NULL;
