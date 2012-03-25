@@ -391,10 +391,15 @@ void test_fun_assoc() {
     ASSERT_PRINT("(ASSOC 'B '((A 1) (B 2) (C 3)))", "2");
 }
 
+void test_fun_pair() {
+    // TODO
+}
+
 int setup_fun_suite() {
     MAKE_SUITE("Lisp functional tests");
 
     ADD_TEST(test_fun_assoc, "ASSOC");
+    // TODO - ADD_TEST(test_fun_pair, "PAIR");
 
     return 0;
 }

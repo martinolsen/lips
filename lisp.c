@@ -14,132 +14,13 @@
 static object_t *expand(lisp_t *, object_t *);
 
 object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
-    DEBUG("lisp_read[_, %s, %d]", s, len);
+    TRACE("lisp_read[_, %s, %d]", s, len);
 
     object_t *stream = object_stream_new(s, len);
     object_t *o = read(lisp, stream);
 
-    DEBUG(" lisp_read: %s", lisp_print(o));
-
     return expand(lisp, o);
 }
-
-#if 0
-static object_t *read_object(lexer_t *);
-static object_t *read_quote(lexer_t *, lexer_token_t *);
-static object_t *read_string(lexer_token_t *);
-static object_t *read_integer(lexer_token_t *);
-static object_t *read_symbol(lexer_token_t *);
-static object_t *read_list(lexer_t *);
-
-static object_t *read_object(lexer_t * lexer) {
-    object_t *object;
-
-    lexer_token_t *token = lexer_expect(lexer, TOKEN_ATOM);
-
-    if(token == NULL)
-        return read_list(lexer);
-
-    object = read_quote(lexer, token);
-    if(object != NULL)
-        return object;
-
-    object = read_integer(token);
-    if(object != NULL)
-        return object;
-
-    object = read_string(token);
-    if(object != NULL)
-        return object;
-
-    object = read_symbol(token);
-    if(object != NULL)
-        return object;
-
-    return NULL;
-}
-
-static object_t *read_quote(lexer_t * lexer, lexer_token_t * token) {
-    if(token->type != TOKEN_ATOM)
-        return NULL;
-
-    if((token->len != 1) || (token->text[0] != '\''))
-        return NULL;
-
-    return object_cons_new(object_symbol_new("QUOTE"),
-                           object_cons_new(read_object(lexer), NULL));
-}
-
-static object_t *read_symbol(lexer_token_t * token) {
-    if(token->type != TOKEN_ATOM)
-        return NULL;
-
-    object_symbol_t *symbol =
-        (object_symbol_t *) object_symbol_new(calloc(1, token->len + 1));
-
-    if(symbol->name == NULL)
-        PANIC("read_symbol: calloc");
-
-    strncpy((char *restrict) symbol->name, token->text, token->len);
-
-    return (object_t *) symbol;
-}
-
-static object_t *read_string(lexer_token_t * token) {
-    if((token == NULL) || (token->type != TOKEN_ATOM) || (token->len == 0))
-        return NULL;
-
-    // String tokens must be surrounded by quotes
-    if((token->text[0] != '"') || (token->text[token->len] != '"'))
-        return NULL;
-
-    object_string_t *o = (object_string_t *)
-        object_string_new(calloc(token->len, sizeof(char)),
-                          token->len - 1);
-
-    if(o->string == NULL)
-        PANIC("read_string: calloc");
-
-    strncpy((char *restrict) o->string, token->text + 1, token->len + 2);
-
-    return (object_t *) o;
-}
-
-static object_t *read_integer(lexer_token_t * token) {
-    if((token == NULL) || (token->type != TOKEN_ATOM) || (token->len == 0))
-        return NULL;
-
-    // Check token is all numbers [0..9]
-    for(size_t i = 0; i < token->len; i++) {
-        if(!isdigit(token->text[i]))
-            return NULL;
-    }
-
-    return object_integer_new(atoi(token->text));
-}
-
-static object_t *read_list(lexer_t * lexer) {
-    lexer_token_t *token = lexer_expect(lexer, TOKEN_LIST_START);
-
-    if((token == NULL) || (token->type != TOKEN_LIST_START))
-        PANIC("read_list - no TOKEN_LIST_START!");
-
-    if((token == NULL) || (lexer_expect(lexer, TOKEN_LIST_END)))
-        return NULL;
-
-    object_t *list = object_cons_new(NULL, NULL);
-    object_cons_t *pair = (object_cons_t *) list;
-
-    while(NULL == lexer_expect(lexer, TOKEN_LIST_END)) {
-        pair->car = read_object(lexer);
-        pair->cdr = object_cons_new(NULL, NULL);
-
-        pair = (object_cons_t *) pair->cdr;
-    }
-
-    return list;
-}
-#endif
 
 lisp_env_t *lisp_env_new(lisp_env_t * outer, object_t * labels) {
     lisp_env_t *env = calloc(1, sizeof(lisp_env_t));
@@ -173,7 +54,7 @@ object_t *car(object_t * cons) {
         return NULL;
 
     if(cons->type != OBJECT_CONS) {
-        PANIC("car: object is not a list: %s (%d)\n",
+        PANIC("car: object is not a list: »%s« (%d)\n",
               lisp_print(cons), cons->type);
     }
 
@@ -268,7 +149,6 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
  *   (assoc 'b '((a 1) (b 2) (c 3)))
  *   2
  */
-// TODO add test
 object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
     TRACE("assoc[_, %s, %s]", lisp_print(x), lisp_print(o));
 
@@ -426,8 +306,6 @@ static object_t *mread_list(lisp_t * l, char x, object_t * stream) {
     object_t *tail = NULL;
 
     while((o = read(l, stream))) {
-        DEBUG(" got token: %s", lisp_print(o));
-
         if(tail == NULL) {
             tail = ((object_cons_t *) list)->cdr = cons(o, NULL);
         }
@@ -437,6 +315,37 @@ static object_t *mread_list(lisp_t * l, char x, object_t * stream) {
     }
 
     return list;
+}
+
+static object_t *mread_str(lisp_t * l, char x, object_t * stream) {
+    l = l;
+
+    if(x != '"')
+        PANIC("mread_str cannot read non-string");
+
+    size_t str_idx = 0, str_sz = 255;
+    char *str = ALLOC(str_sz + 1);
+
+    while(!stream_is_eof(stream)) {
+        if(str_idx > str_sz)
+            PANIC("string overflow");
+
+        char x = stream_read_char(stream);
+
+        if(x == '"')
+            break;
+
+        str[str_idx++] = x;
+    }
+
+    return object_string_new(str, str_idx);
+}
+
+static object_t *mread_quote(lisp_t * l, char x, object_t * stream) {
+    if(x != '\'')
+        PANIC("mread_quote cannot read non-quote");
+
+    return cons(object_symbol_new("QUOTE"), cons(read(l, stream), NULL));
 }
 
 /** Read s-expression from stream.
@@ -472,30 +381,27 @@ object_t *read(lisp_t * l, object_t * stream) {
          */
     } while((x == ' ') || (x == '\t') || (x == '\n'));
 
-    DEBUG("read[_, %c]", x);
-
     /* 4. If x is a terminating or non-terminating macro character then its
      * associated reader macro function is called with two arguments, the
      * input stream and x.
      */
 
-    if(x == '(') {
-        DEBUG(" calling list macro reader");
+    object_t *rt = l->readtable;
 
-        return mread_list(l, x, stream);
-    }
-    else if(x == ')') {
+    do {
+        char x_str[3] = { x, 0, 0 };
+
+        if(!eq(l, car(car(rt)), object_symbol_new(x_str)))
+            continue;
+
+        object_t *(*mreader) (lisp_t *, char, object_t *) =
+            (void *) cdr(car(rt));
+
+        return (*mreader) (l, x, stream);
+    } while((rt = cdr(rt)));
+
+    if(x == ')') {              // TODO - escape characters
         return NULL;
-    }
-    else if(x == '"') {
-        PANIC("cannot read strings...");
-    }
-    else if(x == '\'') {
-        DEBUG(" reading quote");
-
-        object_t *o = read(l, stream);
-
-        return cons(object_symbol_new("QUOTE"), cons(o, NULL));
     }
 
     /* 5. If x is a single escape character then the next character, y, is
@@ -558,17 +464,29 @@ object_t *read(lisp_t * l, object_t * stream) {
         return NULL;
     }
 
-    DEBUG(" read token:  »%s«", token);
-
     // create number object, if possible
     for(size_t i = 0; (token_idx > i) && isdigit(token[i]); i++) {
-        DEBUG("  %c", token[i]);
-
         if(i == token_idx - 1)
             return object_integer_new(atoi(token));
     }
 
     return object_symbol_new(token);
+}
+
+static object_t *readtable_new(void) {
+    object_t *readtable = NULL;
+    object_t *entry = NULL;
+
+    entry = cons(object_symbol_new("("), (object_t *) mread_list);
+    readtable = cons(entry, readtable);
+
+    entry = cons(object_symbol_new("\""), (object_t *) mread_str);
+    readtable = cons(entry, readtable);
+
+    entry = cons(object_symbol_new("\'"), (object_t *) mread_quote);
+    readtable = cons(entry, readtable);
+
+    return readtable;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -735,6 +653,7 @@ lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
 
     l->env = lisp_env_new(NULL, NULL);
+    l->readtable = readtable_new();
 
     l->t = object_symbol_new("T");
     l->nil = object_symbol_new("NIL");
