@@ -599,8 +599,12 @@ object_t *object_cons_new(object_t * car, object_t * cdr) {
     return (object_t *) cons;
 }
 
-object_t *object_function_new(void) {
-    return (object_t *) object_new(OBJECT_FUNCTION);
+object_t *object_function_new(void *fptr) {
+    object_function_t *of = (object_function_t *) object_new(OBJECT_FUNCTION);
+
+    of->fptr = fptr;
+
+    return (object_t *) of;
 }
 
 object_t *object_lambda_new(object_t * args, object_t * expr) {
@@ -697,6 +701,50 @@ int logger(const char *lvl, const char *file, const int line,
     return fprintf(stderr, "%s[%s:%03d] - %s\n", lvl, file, line, s);
 }
 
+object_t *atom_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    env = env;
+
+    return atom(l, car(args));
+}
+
+object_t *eq_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    env = env;
+
+    return eq(l, car(args), car(cdr(args)));
+}
+
+object_t *car_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    l = l;
+    env = env;
+
+    return car(car(args));
+}
+
+object_t *cdr_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    l = l;
+    env = env;
+
+    return cdr(car(args));
+}
+
+object_t *cons_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    l = l;
+    env = env;
+
+    return cons(car(args), car(cdr(args)));
+}
+
+object_t *eval_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    return lisp_eval(l, env, car(args));
+}
+
+#define MAKE_FUNCTION(lisp, name, fptr) do { \
+    object_t *f = object_function_new(fptr); \
+    object_t *s = object_symbol_new(name); \
+    object_t *kv = cons(s, cons(f, NULL)); \
+    lisp->env->labels = cons(kv, lisp->env->labels); \
+    } while(0);
+
 #define MAKE_BUILTIN(lisp, name, sexpr) do { \
     object_t *obj = lisp_read(lisp, sexpr, strlen(sexpr)); \
     if(NULL == lisp_eval(lisp, lisp->env, obj)) \
@@ -710,15 +758,9 @@ int logger(const char *lvl, const char *file, const int line,
  *                (cond ((eq (car (car y)) x) (car (cdr (car y))))
  *                      ('t (assoc x (cdr y))))))
  */
-#if 0
-#define SEXPR_ASSOC "(LABEL ASSOC (LAMBDA (X Y)" \
-    "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
-    "      ('T (ASSOC X (CDR Y))))))"
-#else
 #define SEXPR_ASSOC "(DEFUN ASSOC (X Y)" \
     "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
     "      ('T (ASSOC X (CDR Y)))))"
-#endif
 
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
@@ -728,6 +770,13 @@ lisp_t *lisp_new() {
 
     l->t = object_symbol_new("T");
     l->nil = object_symbol_new("NIL");
+
+    MAKE_FUNCTION(l, "ATOM", atom_fw);
+    MAKE_FUNCTION(l, "EQ", eq_fw);
+    MAKE_FUNCTION(l, "CAR", car_fw);
+    MAKE_FUNCTION(l, "CDR", cdr_fw);
+    MAKE_FUNCTION(l, "CONS", cons_fw);
+    MAKE_FUNCTION(l, "EVAL", eval_fw);
 
     MAKE_BUILTIN(l, "DEFUN", SEXPR_DEFUN);
     MAKE_BUILTIN(l, "ASSOC", SEXPR_ASSOC);

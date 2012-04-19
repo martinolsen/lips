@@ -69,7 +69,7 @@ object_t *pair(lisp_t *, object_t *, object_t *);
 object_t *assoc(lisp_t *, object_t *, object_t *);
 
 object_t *object_cons_new(object_t *, object_t *);
-object_t *object_function_new(void);
+object_t *object_function_new(void *);
 object_t *object_lambda_new(object_t *, object_t *);
 object_t *object_macro_new(object_t *, object_t *);
 object_t *object_integer_new(int);
@@ -110,7 +110,6 @@ struct object_cons_t {
 struct object_function_t {
     object_t object;
     object_t *(*fptr) (lisp_t *, lisp_env_t *, object_t *);
-    int args;
 };
 
 struct object_lambda_t {
