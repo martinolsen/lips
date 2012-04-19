@@ -12,7 +12,7 @@ static object_t *evlis(lisp_t *, lisp_env_t *, object_t *);
 
 /** Evaluate a LISP form.  */
 object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
-    DEBUG("lisp_eval[_, _, %s]", lisp_print(exp));
+    TRACE("lisp_eval[_, _, %s]", lisp_print(exp));
 
     if(exp == NULL)
         return NULL;
@@ -29,12 +29,25 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             if(eq(l, exp, l->nil))
                 return NULL;
 
-            object_t *obj = assoc(l, exp, env ? env->labels : l->env->labels);
+            object_t *o = NULL;
 
-            if(obj != NULL)
-                return obj;
+            if(env != NULL)
+                o = assoc(l, exp, env->labels);
 
-            PANIC("undefined symbol: %s", exp);
+            if(o != NULL)
+                return o;
+
+            if(l->env != NULL)
+                o = assoc(l, exp, l->env->labels);
+
+            if(o != NULL)
+                return o;
+
+            DEBUG(" symbols: %s + %s",
+                  l->env ? lisp_print((object_t *) l->env->labels) : "()",
+                  env ? lisp_print((object_t *) env->labels) : "()");
+
+            PANIC("undefined symbol: %s", lisp_print(exp));
         case OBJECT_ERROR:
         case OBJECT_CONS:
         case OBJECT_FUNCTION:
@@ -109,8 +122,7 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             // TODO validate args against argdef
 
             /* Pair argument names to input, create env */
-            object_t *args = cdr(exp);
-            object_t *env_pair = pair(l, m->args, evlis(l, env, args));
+            object_t *env_pair = pair(l, m->args, cdr(exp));
             lisp_env_t *lenv = lisp_env_new(env, env_pair);
 
             return lisp_eval(l, lenv, m->expr);
@@ -124,13 +136,16 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             operator = assoc(l, car(exp), l->env->labels);
 
         if(operator == NULL) {
-            ERROR("invalid operator: %s", lisp_print(car(exp)));
+            DEBUG(" symbols: %s + %s",
+                  l->env ? lisp_print((object_t *) l->env->labels) : "()",
+                  env ? lisp_print((object_t *) env->labels) : "()");
+
+            ERROR("invalid operator: %s in %s", lisp_print(car(exp)),
+                  lisp_print(exp));
             return NULL;
         }
 
-        object_t *tail = cdr(exp);
-
-        return lisp_eval(l, env, cons(operator, tail));
+        return lisp_eval(l, env, cons(operator, cdr(exp)));
     }
     else if(eq(l, car(car(exp)), object_symbol_new("LAMBDA"))) {
         return lisp_eval(l,

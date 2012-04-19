@@ -385,6 +385,19 @@ int setup_lisp_suite() {
  ** Functional suite        **
  *****************************/
 
+void test_fun_defun() {
+    const char *foo_sexpr = "(DEFUN FOO (A) (CONS A (CONS A NIL)))";
+    lisp_t *l = lisp_new();
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(l);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(teval(l, foo_sexpr));
+
+    object_t *r = teval(l, "(FOO 42)");
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(r);
+    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(42 42)");
+}
+
 void test_fun_assoc() {
     ASSERT_PRINT("(ASSOC 'A '((A 1) (B 2)))", "1");
     ASSERT_PRINT("(ASSOC 'A '((A 1) (A 0) (B 2)))", "1");
@@ -398,6 +411,7 @@ void test_fun_pair() {
 int setup_fun_suite() {
     MAKE_SUITE("Lisp functional tests");
 
+    ADD_TEST(test_fun_defun, "DEFUN");
     ADD_TEST(test_fun_assoc, "ASSOC");
     // TODO - ADD_TEST(test_fun_pair, "PAIR");
 

@@ -11,7 +11,10 @@
 #include "lexer.h"
 #include "list.h"
 
-static object_t *expand(lisp_t *, object_t *);
+static object_t *macroexpand(lisp_t *, object_t *, object_t *);
+static object_t *macroexpand_1(lisp_t *, object_t *, object_t *);
+static object_t *macroexpand_hook(lisp_t *, object_t *, object_t *,
+                                  void *(*)());
 
 object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
     TRACE("lisp_read[_, %s, %d]", s, len);
@@ -19,7 +22,7 @@ object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
     object_t *stream = object_stream_new(s, len);
     object_t *o = read(lisp, stream);
 
-    return expand(lisp, o);
+    return car(macroexpand(lisp, NULL, o));
 }
 
 lisp_env_t *lisp_env_new(lisp_env_t * outer, object_t * labels) {
@@ -294,6 +297,8 @@ static void stream_unread_char(object_t * o, char x) {
 
 /** Read list of objects from input-stream. */
 static object_t *mread_list(lisp_t * l, char x, object_t * stream) {
+    TRACE("mread_list[_, '%c', »%s«]", x, lisp_print(stream));
+
     if(x != '(')
         PANIC("mread_list cannot read non-list");
 
@@ -310,8 +315,9 @@ static object_t *mread_list(lisp_t * l, char x, object_t * stream) {
             tail = ((object_cons_t *) list)->cdr = cons(o, NULL);
         }
         else {
-            ((object_cons_t *) tail)->cdr = cons(o, NULL);
+            tail = ((object_cons_t *) tail)->cdr = cons(o, NULL);
         }
+
     }
 
     return list;
@@ -356,7 +362,7 @@ static object_t *mread_unquote(lisp_t * l, char x, object_t * stream) {
 }
 
 static object_t *mread_backquote(lisp_t * l, char x, object_t * stream) {
-    DEBUG("mread_backquote[_, _, _]");
+    TRACE("mread_backquote[_, _, _]");
 
     if(x != '`')
         PANIC("mread_backquote cannot read non-backquote");
@@ -374,20 +380,13 @@ static object_t *mread_backquote(lisp_t * l, char x, object_t * stream) {
     while(elems) {
         object_t *o = NULL;
 
-        DEBUG(" elems: »%s«", lisp_print(elems));
-        DEBUG(" list:  »%s«", lisp_print(list));
-
-        if(atom(l, car(elems))) {
-            o = cons(object_symbol_new("QUOTE"), cons(car(elems), NULL));
-        }
-        else if(eq(l, car(car(elems)), object_symbol_new("UNQUOTE"))) {
+        if(!atom(l, car(elems))
+           && eq(l, car(car(elems)), object_symbol_new("UNQUOTE"))) {
             o = car(cdr(car(elems)));
         }
         else {
-            PANIC("mread_backquote is confused by »%s«", lisp_print(elems));
+            o = cons(object_symbol_new("QUOTE"), cons(car(elems), NULL));
         }
-
-        DEBUG(" o:     »%s«", lisp_print(o));
 
         if(list == NULL) {
             list = cons(o, NULL);
@@ -396,15 +395,13 @@ static object_t *mread_backquote(lisp_t * l, char x, object_t * stream) {
             tail = ((object_cons_t *) list)->cdr = cons(o, NULL);
         }
         else {
-            ((object_cons_t *) tail)->cdr = cons(o, NULL);
+            tail = ((object_cons_t *) tail)->cdr = cons(o, NULL);
         }
 
         elems = cdr(elems);
     }
 
     l->readtable = old_readtable;
-
-    DEBUG(" backquoted list: »%s«", lisp_print(list));
 
     return list;
 }
@@ -450,7 +447,9 @@ object_t *read(lisp_t * l, object_t * stream) {
     object_t *rt = l->readtable;
 
     do {
-        char x_str[3] = { x, 0, 0 };
+        char x_str[3] = {
+            x, 0, 0
+        };
 
         if(!eq(l, car(car(rt)), object_symbol_new(x_str)))
             continue;
@@ -531,7 +530,7 @@ object_t *read(lisp_t * l, object_t * stream) {
             return object_integer_new(atoi(token));
     }
 
-    return object_symbol_new(token);
+    return (object_t *) object_symbol_new(token);
 }
 
 static object_t *readtable_new(void) {
@@ -680,7 +679,6 @@ void *ALLOC(const size_t sz) {
         perror("calloc");
         exit(EXIT_FAILURE);
     }
-
     return o;
 }
 
@@ -701,12 +699,12 @@ int logger(const char *lvl, const char *file, const int line,
 
 #define MAKE_BUILTIN(lisp, name, sexpr) do { \
     object_t *obj = lisp_read(lisp, sexpr, strlen(sexpr)); \
-    if(NULL == lisp_eval(lisp, NULL, obj)) \
+    if(NULL == lisp_eval(lisp, lisp->env, obj)) \
         PANIC("lisp_new: could not create %s operator", name); \
     } while(0);
 
-#define SEXPR_DEFUN "(LABEL DEFUN (MACRO (NAME ARGS BODY)" \
-    "`(LABEL ,NAME ,ARGS ,BODY)))"
+#define SEXPR_DEFUN "(LABEL DEFUN " \
+    "(MACRO (NAME ARGS BODY) (LABEL NAME (LAMBDA ARGS BODY))))"
 
 /* (label assoc (lambda (x y)
  *                (cond ((eq (car (car y)) x) (car (cdr (car y))))
@@ -734,8 +732,6 @@ lisp_t *lisp_new() {
     MAKE_BUILTIN(l, "DEFUN", SEXPR_DEFUN);
     MAKE_BUILTIN(l, "ASSOC", SEXPR_ASSOC);
 
-    DEBUG("created initial lisp environment");
-
     return l;
 }
 
@@ -744,10 +740,83 @@ lisp_t *lisp_new() {
  * TODO:
  *  * should macro expansion really happen before the reader returns?
  */
-static object_t *expand(lisp_t * l, object_t * o) {
-    l = l;
+static object_t *macroexpand(lisp_t * l, object_t * labels, object_t * form) {
+    int expanded = 0;
 
-    return o;
+    while(1) {
+        object_t *r = macroexpand_1(l, labels, form);
+
+        if(!eq(l, car(cdr(r)), l->t))
+            break;
+
+        form = car(r);
+        expanded = 1;
+    }
+
+    return cons(form, cons(expanded ? l->t : NULL, NULL));
+}
+
+static object_t *macroexpand_1(lisp_t * l, object_t * labels, object_t * form) {
+    int expanded = 0;
+
+    if(form == NULL || atom(l, form) || car(form) == NULL)
+        return cons(form, cons(expanded ? l->t : NULL, NULL));
+
+    // do we have a macro form?
+    object_t *m = assoc(l, car(form), l->env->labels);
+
+    if(m == NULL || m->type != OBJECT_MACRO)
+        return cons(form, cons(expanded ? l->t : NULL, NULL));
+
+    // associate the arguments - TODO - old labels are ignored!
+    labels = pair(l, ((object_macro_t *) m)->args, cdr(form));
+
+    return macroexpand_hook(l, labels, ((object_macro_t *) m)->expr,
+                            (void *(*)()) macroexpand_hook);
+}
+
+static object_t *macroexpand_hook(lisp_t * l, object_t * labels,
+                                  object_t * form, void *hook()) {
+
+    int expanded = 0;
+
+    object_t *e = form;
+    object_t *exptail = NULL, *exphead = NULL;
+
+    if(e == NULL)
+        return cons(form, cons(expanded ? l->t : NULL, NULL));
+
+    do {
+        object_t *n = car(e);
+
+        object_t *x = NULL;
+
+        if(atom(l, n)) {
+            x = assoc(l, n, labels);
+        }
+        else {
+            object_t *r = hook(l, labels, n, hook);
+
+            if(!eq(l, cdr(r), l->t)) {
+                x = car(r);
+                expanded = 1;
+            }
+        }
+
+        if(x != NULL) {
+            n = x;
+            expanded = 1;
+        }
+
+        if(exphead == NULL)
+            exphead = cons(n, NULL);
+        else if(exptail == NULL)
+            exptail = ((object_cons_t *) exphead)->cdr = cons(n, NULL);
+        else
+            exptail = ((object_cons_t *) exptail)->cdr = cons(n, NULL);
+    } while((e = cdr(e)));
+
+    return cons(exphead, cons(expanded ? l->t : NULL, NULL));
 }
 
 /* TODO:

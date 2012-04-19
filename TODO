@@ -6,3 +6,6 @@
   * split out object_t functions
 * Memory management
   * possibly using environments - see 'let'
+* Proper environment
+  * ie. "lisp_eval(l, env, _)", labels added inside call will not be visible
+    after.
