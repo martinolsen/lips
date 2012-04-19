@@ -405,7 +405,8 @@ void test_fun_assoc() {
 }
 
 void test_fun_pair() {
-    // TODO
+    ASSERT_PRINT("(PAIR '(A B C) '(1 2 3))", "((A 1) (B 2) (C 3))");
+    ASSERT_PRINT("(ASSOC 'B (PAIR '(A B C) '(1 2 3)))", "2");
 }
 
 int setup_fun_suite() {
@@ -413,7 +414,7 @@ int setup_fun_suite() {
 
     ADD_TEST(test_fun_defun, "DEFUN");
     ADD_TEST(test_fun_assoc, "ASSOC");
-    // TODO - ADD_TEST(test_fun_pair, "PAIR");
+    ADD_TEST(test_fun_pair, "PAIR");
 
     return 0;
 }

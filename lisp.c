@@ -738,6 +738,18 @@ object_t *eval_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
     return lisp_eval(l, env, car(args));
 }
 
+object_t *assoc_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    env = env;
+
+    return assoc(l, car(args), car(cdr(args)));
+}
+
+object_t *pair_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+    env = env;
+
+    return pair(l, car(args), car(cdr(args)));
+}
+
 #define MAKE_FUNCTION(lisp, name, fptr) do { \
     object_t *f = object_function_new(fptr); \
     object_t *s = object_symbol_new(name); \
@@ -753,14 +765,6 @@ object_t *eval_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
 
 #define SEXPR_DEFUN "(LABEL DEFUN " \
     "(MACRO (NAME ARGS BODY) (LABEL NAME (LAMBDA ARGS BODY))))"
-
-/* (label assoc (lambda (x y)
- *                (cond ((eq (car (car y)) x) (car (cdr (car y))))
- *                      ('t (assoc x (cdr y))))))
- */
-#define SEXPR_ASSOC "(DEFUN ASSOC (X Y)" \
-    "(COND ((EQ (CAR (CAR Y)) X) (CAR (CDR (CAR Y))))" \
-    "      ('T (ASSOC X (CDR Y)))))"
 
 lisp_t *lisp_new() {
     lisp_t *l = calloc(1, sizeof(lisp_t));
@@ -778,8 +782,10 @@ lisp_t *lisp_new() {
     MAKE_FUNCTION(l, "CONS", cons_fw);
     MAKE_FUNCTION(l, "EVAL", eval_fw);
 
+    MAKE_FUNCTION(l, "PAIR", pair_fw);
+    MAKE_FUNCTION(l, "ASSOC", assoc_fw);
+
     MAKE_BUILTIN(l, "DEFUN", SEXPR_DEFUN);
-    MAKE_BUILTIN(l, "ASSOC", SEXPR_ASSOC);
 
     return l;
 }

@@ -21,10 +21,10 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
     if(exp == NULL)
         return NULL;
 
-    if(atom(l, exp)) {
+    if(atom(l, exp))
         return evatom(l, env, exp);
-    }
-    else if(atom(l, car(exp))) {
+
+    if(atom(l, car(exp))) {
         if(eq(l, car(exp), object_symbol_new("QUOTE"))) {
             return car(cdr(exp));
         }
