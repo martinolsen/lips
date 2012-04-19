@@ -90,14 +90,6 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
     else {
         return lisp_eval(l, env, cons(lisp_eval(l, env, car(exp)), cdr(exp)));
     }
-    /*
-     * else if(eq(l, car(car(exp)), object_symbol_new("LAMBDA"))) {
-     * return lisp_eval(l,
-     * lisp_env_new(env, pair(l,
-     * car(cdr(car(exp))),
-     * evlis(l, env, cdr(exp)))),
-     * car(cdr(cdr(car(exp)))));
-     * } */
 
     PANIC("lisp_eval: not yet implemented: %s", lisp_print(exp));
 }
