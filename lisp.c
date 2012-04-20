@@ -57,10 +57,8 @@ object_t *car(object_t * cons) {
     if(cons == NULL)
         return NULL;
 
-    if(cons->type != OBJECT_CONS) {
-        PANIC("car: object is not a list: »%s« (%d)\n",
-              lisp_print(cons), cons->type);
-    }
+    if(cons->type != OBJECT_CONS)
+        return NULL;
 
     return ((object_cons_t *) cons)->car;
 }
@@ -70,7 +68,7 @@ object_t *cdr(object_t * cons) {
         return NULL;
 
     if(cons->type != OBJECT_CONS)
-        PANIC("cdr: object is not a list: %s\n", lisp_print(cons));
+        return NULL;
 
     return ((object_cons_t *) cons)->cdr;
 }
