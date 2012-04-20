@@ -1,0 +1,71 @@
+# Lisp Is Pretty Sweet
+
+LIPS is a Lisp dialect striving for elegant simplicity and performance.
+
+# Installation
+
+The core is implemented in strict C99 which should make it easy to compile
+with most compilers. Besides a C compiler and make, LIPS requires libao and
+readline.
+
+On Debian-derieved these are easily:
+
+    apt-get install build-essential libreadline-dev libao-dev
+
+The latest version of LIPS is available from the [repository](http://github.com/martinolsen/lips)
+
+    git clone https://github.com/martinolsen/lips
+
+Compile and test the code:
+
+    make clean all run-test
+
+There, this is pretty much all it does right now.
+
+# Language
+
+## Data types
+
+### Integers
+
+Integers are simple numbers
+
+    42
+    => 42
+
+### Strings
+
+Strings are denoted by enclosing double-quotes
+
+    "Hello world!"
+    => "Hello world!"
+
+### Cons
+
+### Symbols
+
+## Functions
+
+### CONS
+
+### CAR
+
+### CDR
+
+### ATOM
+
+### COND
+
+### EQ
+
+### ASSOC
+
+### PAIR
+
+### LABEL
+
+### LAMBDA
+
+### MACRO
+
+Macros are expanded by the reader, just before evaluation.
