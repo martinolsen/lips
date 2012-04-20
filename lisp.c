@@ -1,15 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdbool.h>
 
+#include "logger.h"
 #include "lisp.h"
 #include "lisp_print.h"
 #include "lisp_eval.h"
 #include "lexer.h"
 #include "list.h"
+#include "object.h"
 
 static object_t *macroexpand(lisp_t *, object_t *, object_t *);
 static object_t *macroexpand_1(lisp_t *, object_t *, object_t *);
@@ -330,7 +331,7 @@ static object_t *mread_str(lisp_t * l, char x, object_t * stream) {
         PANIC("mread_str cannot read non-string");
 
     size_t str_idx = 0, str_sz = 255;
-    char *str = ALLOC(str_sz + 1);
+    char *str = calloc(str_sz + 1, sizeof(char));
 
     while(!stream_is_eof(stream)) {
         if(str_idx > str_sz)
@@ -552,155 +553,6 @@ static object_t *readtable_new(void) {
     return readtable;
 }
 
-//////////////////////////////////////////////////////////////////////////////
-///////////////////////////////// OBJECTS ////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////
-
-static size_t object_sz(object_type_t type) {
-    switch (type) {
-    case OBJECT_CONS:
-        return sizeof(object_cons_t);
-    case OBJECT_FUNCTION:
-        return sizeof(object_function_t);
-    case OBJECT_LAMBDA:
-        return sizeof(object_lambda_t);
-    case OBJECT_MACRO:
-        return sizeof(object_macro_t);
-    case OBJECT_INTEGER:
-        return sizeof(object_integer_t);
-    case OBJECT_STRING:
-        return sizeof(object_string_t);
-    case OBJECT_SYMBOL:
-        return sizeof(object_symbol_t);
-    case OBJECT_STREAM:
-        return sizeof(object_stream_t);
-    case OBJECT_ERROR:
-        PANIC("object_new: unknwon error");
-    }
-
-    ERROR("object_new: unknown type");
-    exit(EXIT_FAILURE);
-}
-
-static object_t *object_new(object_type_t type) {
-    object_t *object = ALLOC(object_sz(type));
-
-    object->type = type;
-
-    return object;
-}
-
-object_t *object_cons_new(object_t * car, object_t * cdr) {
-    object_cons_t *cons = (object_cons_t *) object_new(OBJECT_CONS);
-
-    cons->car = car;
-    cons->cdr = cdr;
-
-    return (object_t *) cons;
-}
-
-object_t *object_function_new(void *fptr) {
-    object_function_t *of = (object_function_t *) object_new(OBJECT_FUNCTION);
-
-    of->fptr = fptr;
-
-    return (object_t *) of;
-}
-
-object_t *object_lambda_new(object_t * args, object_t * expr) {
-
-    object_lambda_t *l = (object_lambda_t *) object_new(OBJECT_LAMBDA);
-
-    l->args = args;
-    l->expr = expr;
-
-    return (object_t *) l;
-}
-
-object_t *object_macro_new(object_t * args, object_t * expr) {
-
-    object_macro_t *l = (object_macro_t *) object_new(OBJECT_MACRO);
-
-    l->args = args;
-    l->expr = expr;
-
-    return (object_t *) l;
-}
-
-object_t *object_integer_new(int num) {
-    object_integer_t *o = (object_integer_t *) object_new(OBJECT_INTEGER);
-
-    o->number = num;
-    return (object_t *) o;
-}
-
-object_t *object_string_new(char *s, size_t n) {
-    object_string_t *o = (object_string_t *) object_new(OBJECT_STRING);
-
-    o->string = s;
-    o->len = n;
-
-    return (object_t *) o;
-}
-
-object_t *object_symbol_new(char *s) {
-    object_symbol_t *o = (object_symbol_t *) object_new(OBJECT_SYMBOL);
-    size_t sz = strlen(s);
-
-    o->name = ALLOC(sz);
-
-    memcpy((char *) o->name, s, sz);
-
-    return (object_t *) o;
-}
-
-object_t *object_stream_new(const char *buf, size_t sz) {
-    object_stream_t *o = (object_stream_t *) object_new(OBJECT_STREAM);
-
-    o->buf = ALLOC(sz);
-    o->buf_sz = sz;
-    o->buf_idx = 0;
-
-    memcpy(o->buf, buf, sz);
-
-    return (object_t *) o;
-}
-
-int object_isa(object_t * o, object_type_t t) {
-    if(o == NULL)
-        return 0;
-
-    if(o->type != t)
-        return 0;
-
-    return 1;
-}
-
-void *ALLOC(const size_t sz) {
-    void *o = calloc(1, sz);
-
-    if(o == NULL) {
-        perror("calloc");
-        exit(EXIT_FAILURE);
-    }
-    return o;
-}
-
-int logger(const char *lvl, const char *file, const int line,
-           const char *fmt, ...) {
-
-    va_list ap;
-
-    const size_t len = 1024;
-    char *s = calloc(len, sizeof(char));
-
-    va_start(ap, fmt);
-    vsnprintf(s, len, fmt, ap);
-    va_end(ap);
-
-    return fprintf(stderr, "%s[%s:%03d] - %s\n", lvl, file, line, s);
-}
-
 object_t *atom_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
     env = env;
 
@@ -875,6 +727,5 @@ static object_t *macroexpand_hook(lisp_t * l, object_t * labels,
 }
 
 /* TODO:
- *   - Arguments (in definitions) should be defined by lists, not int count
- *   - Split out print_*, read_* and object_*
+ *   - Split out print_*, read_*
  */

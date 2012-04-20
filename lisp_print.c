@@ -1,8 +1,10 @@
+#include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 
+#include "logger.h"
 #include "lisp.h"
 #include "lisp_print.h"
 
@@ -83,7 +85,7 @@ static const char *print_integer(object_t * o) {
 
 static const char *print_cons(object_t * list) {
     const size_t len = 1024;
-    char *s = ALLOC(len * sizeof(char) + 1);
+    char *s = calloc(len + 1, sizeof(char));
     size_t si = snprintf(s, len, "(");
 
     while(list) {

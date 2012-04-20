@@ -1,5 +1,7 @@
 #include <string.h>
 
+#include "object.h"
+#include "logger.h"
 #include "lisp.h"
 #include "lisp_eval.h"
 #include "lisp_print.h"
