@@ -8,7 +8,6 @@
 #include "lisp.h"
 #include "lisp_print.h"
 #include "lisp_eval.h"
-#include "lexer.h"
 #include "list.h"
 #include "object.h"
 

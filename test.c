@@ -4,14 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "lexer.h"
 #include "lisp.h"
 #include "lisp_print.h"
 #include "lisp_eval.h"
 #include "list.h"
 
 #define ARG_TEST_LIST       "--only-list"
-#define ARG_TEST_LEXER      "--only-lexer"
 #define ARG_TEST_LISP_READ  "--only-lisp-read"
 #define ARG_TEST_LISP       "--only-lisp"
 #define ARG_TEST_FUN        "--only-fun"
@@ -96,63 +94,6 @@ int setup_list_suite() {
     }
 
     ADD_TEST(test_list, "list push, pop");
-
-    return 0;
-}
-
-/*****************************
- ** Lexer suite             **
- *****************************/
-
-void test_lexer_end() {
-    const char *s = "";
-    lexer_t *lexer = lexer_init(s, strlen(s));
-
-    CU_ASSERT(lexer != NULL);
-
-    lexer_token_t *token = lexer_next(lexer);
-
-    CU_ASSERT(token != NULL);
-    CU_ASSERT(token->type != TOKEN_EOF);
-}
-
-void test_lexer_atom() {
-    const char *s = "1";
-    lexer_t *lexer = lexer_init(s, strlen(s));
-
-    CU_ASSERT(lexer != NULL);
-
-    CU_ASSERT_EQUAL_FATAL((lexer_next(lexer))->type, TOKEN_ATOM);
-}
-
-void test_lexer_list() {
-    const char *s = "()";
-    lexer_t *lexer = lexer_init(s, strlen(s));
-
-    CU_ASSERT(lexer != NULL);
-
-    CU_ASSERT_EQUAL_FATAL((lexer_next(lexer))->type, TOKEN_LIST_START);
-    CU_ASSERT_EQUAL_FATAL((lexer_next(lexer))->type, TOKEN_LIST_END);
-}
-
-void test_lexer_expect() {
-    const char *s = "()";
-    lexer_t *lexer = lexer_init(s, strlen(s));
-
-    CU_ASSERT(lexer != NULL);
-
-    CU_ASSERT_PTR_NULL_FATAL(lexer_expect(lexer, TOKEN_LIST_END));
-    CU_ASSERT_PTR_NOT_NULL_FATAL(lexer_expect(lexer, TOKEN_LIST_START));
-    CU_ASSERT_PTR_NOT_NULL_FATAL(lexer_expect(lexer, TOKEN_LIST_END));
-}
-
-int setup_lexer_suite() {
-    MAKE_SUITE("Lexer tests");
-
-    ADD_TEST(test_lexer_end, "end token");
-    ADD_TEST(test_lexer_atom, "atom token");
-    ADD_TEST(test_lexer_list, "list token");
-    ADD_TEST(test_lexer_expect, "expect token");
 
     return 0;
 }
@@ -421,7 +362,7 @@ int setup_fun_suite() {
 
 int main(int argc, char **argv) {
     int do_all = 1;
-    int do_list = 0, do_lexer = 0, do_lisp_read = 0, do_lisp = 0, do_fun = 0;
+    int do_list = 0, do_lisp_read = 0, do_lisp = 0, do_fun = 0;
 
     if(CUE_SUCCESS != CU_initialize_registry())
         return CU_get_error();
@@ -429,10 +370,6 @@ int main(int argc, char **argv) {
     for(int i = 0; i < argc; i++) {
         if(0 == strncmp(argv[i], ARG_TEST_LIST, strlen(ARG_TEST_LIST))) {
             do_list = 1;
-            do_all = 0;
-        }
-        else if(0 == strncmp(argv[i], ARG_TEST_LEXER, strlen(ARG_TEST_LEXER))) {
-            do_lexer = 1;
             do_all = 0;
         }
         else if(0 ==
@@ -456,8 +393,6 @@ int main(int argc, char **argv) {
 
     if(do_all || do_list)
         setup_list_suite();
-    if(do_all || do_lexer)
-        setup_lexer_suite();
     if(do_all || do_lisp_read)
         setup_lisp_read_suite();
     if(do_all || do_lisp)
