@@ -185,7 +185,6 @@ object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
  *    (pair '(a b c) '(1 2 3))
  *    ((a 1) (b 2) (c 3))
  */
-// TODO add test
 object_t *pair(lisp_t * l, object_t * k, object_t * v) {
     TRACE("pair[%s@%p, %s@%p]", lisp_print(k), k, lisp_print(v), v);
 
