@@ -50,7 +50,7 @@ static object_t *tread(lisp_t * l, const char *s) {
  *  Uses tread().
  */
 static object_t *teval(lisp_t * l, const char *s) {
-    return lisp_eval(l, NULL, tread(l, s));
+    return lisp_eval(l, tread(l, s));
 }
 
 /** Print the result of an evaluated s-expression to a string.

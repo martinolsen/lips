@@ -34,12 +34,37 @@ lisp_env_t *lisp_env_new(lisp_env_t * outer, object_t * labels) {
     return env;
 }
 
+lisp_env_t *lisp_env_pop(lisp_env_t * env) {
+    if(env == NULL)
+        return NULL;
+
+    return env->outer;
+}
+
+object_t *lisp_env_resolv(lisp_t * l, lisp_env_t * env, object_t * x) {
+    if(env == NULL)
+        return NULL;
+
+    TRACE("lisp_env_resolv[_, %s, %s]", lisp_print(env->labels),
+          lisp_print(x));
+
+    object_t *pairi = env->labels;
+
+    while(pairi) {
+        if(eq(l, car(car(pairi)), x))
+            return car(pairi);
+
+        pairi = cdr(pairi);
+    }
+
+    return lisp_env_resolv(l, env->outer, x);
+}
+
 //////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////// BUILT-IN ///////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
 // Return true if OBJECT is anything other than a CONS
-// TODO: atom should propably take *env also
 object_t *atom(lisp_t * l, object_t * object) {
     if((object == NULL) || (object->type != OBJECT_CONS))
         return l->t;
@@ -72,17 +97,17 @@ object_t *cdr(object_t * cons) {
     return ((object_cons_t *) cons)->cdr;
 }
 
-object_t *cond(lisp_t * l, lisp_env_t * env, object_t * list) {
+object_t *cond(lisp_t * l, object_t * list) {
     if(atom(l, list))
         return NULL;
 
     object_t *test = car(car(list));
     object_t *res = car(cdr(car(list)));
 
-    if(eq(l, lisp_eval(l, env, test), l->t))
+    if(eq(l, lisp_eval(l, test), l->t))
         return res;
 
-    return cond(l, env, cdr(list));
+    return cond(l, cdr(list));
 }
 
 object_t *eq(lisp_t * l, object_t * a, object_t * b) {
@@ -209,29 +234,18 @@ object_t *pair(lisp_t * l, object_t * k, object_t * v) {
     return object_cons_new(head, tail);
 }
 
-object_t *label(lisp_t * l, lisp_env_t * env, object_t * sym, object_t * obj) {
+object_t *label(lisp_t * l, object_t * sym, object_t * obj) {
     TRACE("label(_, %s, %s)", lisp_print(sym), lisp_print(obj));
 
-    lisp_env_t *envi = env;
+    if(l->env == NULL)
+        PANIC("no environment!");
 
-    while(envi != NULL) {
-        if(assoc(l, (object_t *) sym, envi->labels)) {
-            WARN("label: redefining label %s", lisp_print((object_t *) sym));
-        }
-
-        envi = envi->outer;
-    }
+    if(lisp_env_resolv(l, l->env, (object_t *) sym))
+        WARN("label: redefining label %s", lisp_print((object_t *) sym));
 
     object_t *kv = object_cons_new(sym, object_cons_new(obj, NULL));
 
-    if(env == NULL) {
-        if(l->env == NULL)
-            PANIC("no environment!");
-
-        env = l->env;
-    }
-
-    env->labels = object_cons_new(kv, env->labels);
+    l->env->labels = object_cons_new(kv, l->env->labels);
 
     return obj;
 }
@@ -549,52 +563,38 @@ static object_t *readtable_new(void) {
     return readtable;
 }
 
-object_t *atom_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
-    env = env;
-
+object_t *atom_fw(lisp_t * l, object_t * args) {
     return atom(l, car(args));
 }
 
-object_t *eq_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
-    env = env;
-
+object_t *eq_fw(lisp_t * l, object_t * args) {
     return eq(l, car(args), car(cdr(args)));
 }
 
-object_t *car_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+object_t *car_fw(lisp_t * l, object_t * args) {
     l = l;
-    env = env;
-
     return car(car(args));
 }
 
-object_t *cdr_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+object_t *cdr_fw(lisp_t * l, object_t * args) {
     l = l;
-    env = env;
-
     return cdr(car(args));
 }
 
-object_t *cons_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
+object_t *cons_fw(lisp_t * l, object_t * args) {
     l = l;
-    env = env;
-
     return cons(car(args), car(cdr(args)));
 }
 
-object_t *eval_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
-    return lisp_eval(l, env, car(args));
+object_t *eval_fw(lisp_t * l, object_t * args) {
+    return lisp_eval(l, car(args));
 }
 
-object_t *assoc_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
-    env = env;
-
+object_t *assoc_fw(lisp_t * l, object_t * args) {
     return assoc(l, car(args), car(cdr(args)));
 }
 
-object_t *pair_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
-    env = env;
-
+object_t *pair_fw(lisp_t * l, object_t * args) {
     return pair(l, car(args), car(cdr(args)));
 }
 
@@ -607,7 +607,7 @@ object_t *pair_fw(lisp_t * l, lisp_env_t * env, object_t * args) {
 
 #define MAKE_BUILTIN(lisp, name, sexpr) do { \
     object_t *obj = lisp_read(lisp, sexpr, strlen(sexpr)); \
-    if(NULL == lisp_eval(lisp, lisp->env, obj)) \
+    if(NULL == lisp_eval(lisp, obj)) \
         PANIC("lisp_new: could not create %s operator", name); \
     } while(0);
 
@@ -669,9 +669,10 @@ static object_t *macroexpand_1(lisp_t * l, object_t * labels, object_t * form) {
         return cons(form, cons(expanded ? l->t : NULL, NULL));
 
     // do we have a macro form?
-    object_t *m = car(cdr(assoc(l, car(form), l->env->labels)));
+    object_t *mpair = lisp_env_resolv(l, l->env, car(form));
+    object_t *m = car(cdr(mpair));
 
-    if(m == NULL || m->type != OBJECT_MACRO)
+    if((mpair == NULL) || (m == NULL) || (m->type != OBJECT_MACRO))
         return cons(form, cons(expanded ? l->t : NULL, NULL));
 
     // associate the arguments - TODO - old labels are ignored!

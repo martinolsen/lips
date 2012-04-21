@@ -27,5 +27,5 @@ void repl_destroy(repl_t * repl) {
 void repl_run(repl_t * repl) {
     object_t *repl_obj = lisp_read(repl->lisp, REPL_EXPR, strlen(REPL_EXPR));
 
-    lisp_eval(repl->lisp, NULL, repl_obj);
+    lisp_eval(repl->lisp, repl_obj);
 }

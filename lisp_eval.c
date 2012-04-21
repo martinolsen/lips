@@ -6,25 +6,25 @@
 #include "lisp_eval.h"
 #include "lisp_print.h"
 
-static object_t *evatom(lisp_t *, lisp_env_t *, object_t *);
-static object_t *evfun(lisp_t *, lisp_env_t *, object_t *);
-static object_t *evmacr(lisp_t *, lisp_env_t *, object_t *);
-static object_t *evlamb(lisp_t *, lisp_env_t *, object_t *);
+static object_t *evatom(lisp_t *, object_t *);
+static object_t *evfun(lisp_t *, object_t *);
+static object_t *evmacr(lisp_t *, object_t *);
+static object_t *evlamb(lisp_t *, object_t *);
 static object_t *evread(lisp_t *);
 static object_t *evprint(object_t *);
-static object_t *evloop(lisp_t *, lisp_env_t *, object_t *);
-static object_t *evcond(lisp_t *, lisp_env_t *, object_t *);
-static object_t *evlis(lisp_t *, lisp_env_t *, object_t *);
+static object_t *evloop(lisp_t *, object_t *);
+static object_t *evcond(lisp_t *, object_t *);
+static object_t *evlis(lisp_t *, object_t *);
 
 /** Evaluate a LISP form.  */
-object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
-    TRACE("lisp_eval[_, _, %s]", lisp_print(exp));
+object_t *lisp_eval(lisp_t * l, object_t * exp) {
+    TRACE("lisp_eval[_, %s]", lisp_print(exp));
 
     if(exp == NULL)
         return NULL;
 
     if(atom(l, exp))
-        return evatom(l, env, exp);
+        return evatom(l, exp);
 
     if(atom(l, car(exp))) {
         object_t *operator = car(exp);
@@ -42,17 +42,16 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
             return macro(car(cdr(exp)), car(cdr(cdr(exp))));
         }
         else if(eq(l, operator, object_symbol_new("LABEL"))) {
-            return label(l, env, car(cdr(exp)),
-                         lisp_eval(l, env, car(cdr(cdr(exp)))));
+            return label(l, car(cdr(exp)), lisp_eval(l, car(cdr(cdr(exp)))));
         }
         else if(eq(l, operator, object_symbol_new("COND"))) {
-            return evcond(l, env, cdr(exp));
+            return evcond(l, cdr(exp));
         }
         else if(eq(l, operator, object_symbol_new("PRINT"))) {
             return evprint(car(cdr(exp)));
         }
         else if(eq(l, operator, object_symbol_new("LOOP"))) {
-            return evloop(l, env, car(cdr(exp)));
+            return evloop(l, car(cdr(exp)));
         }
         else if(eq(l, operator, object_symbol_new("READ"))) {
             return evread(l);
@@ -60,11 +59,11 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
 
         switch (operator-> type) {
         case OBJECT_LAMBDA:
-            return evlamb(l, env, exp);
+            return evlamb(l, exp);
         case OBJECT_MACRO:
-            return evmacr(l, env, exp);
+            return evmacr(l, exp);
         case OBJECT_FUNCTION:
-            return evfun(l, env, exp);
+            return evfun(l, exp);
         case OBJECT_SYMBOL:
             break;              // will be handled right after switch statement
         case OBJECT_CONS:
@@ -77,32 +76,27 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
 
         /* operator is not one of the builtins, see if it is defined in env */
         // TODO please come up with something smarter than a split environment
-        object_t *fun =
-            car(cdr(assoc(l, operator, env ? env->labels : NULL)));
+        object_t *fpair = lisp_env_resolv(l, l->env, operator);
 
-        if(fun == NULL)
-            fun = car(cdr(assoc(l, operator, l->env->labels)));
-
-        if(fun == NULL) {
-            DEBUG(" symbols: %s + %s",
-                  l->env ? lisp_print((object_t *) l->env->labels) : "()",
-                  env ? lisp_print((object_t *) env->labels) : "()");
+        if(fpair == NULL) {
+            DEBUG(" symbols: %s",
+                  l->env ? lisp_print((object_t *) l->env->labels) : "()");
 
             ERROR("invalid operator: %s in %s", lisp_print(operator),
                   lisp_print(exp));
             return NULL;
         }
 
-        return lisp_eval(l, env, cons(fun, cdr(exp)));
+        return lisp_eval(l, cons(car(cdr(fpair)), cdr(exp)));
     }
     else {
-        return lisp_eval(l, env, cons(lisp_eval(l, env, car(exp)), cdr(exp)));
+        return lisp_eval(l, cons(lisp_eval(l, car(exp)), cdr(exp)));
     }
 
     PANIC("lisp_eval: not yet implemented: %s", lisp_print(exp));
 }
 
-static object_t *evatom(lisp_t * l, lisp_env_t * env, object_t * exp) {
+static object_t *evatom(lisp_t * l, object_t * exp) {
     switch (exp->type) {
     case OBJECT_INTEGER:
     case OBJECT_STRING:
@@ -111,20 +105,13 @@ static object_t *evatom(lisp_t * l, lisp_env_t * env, object_t * exp) {
         if(eq(l, exp, l->t))
             return l->t;
 
-        object_t *pair = NULL;
-
-        if(env != NULL)
-            pair = assoc(l, exp, env->labels);
-
-        if((pair == NULL) && (l->env != NULL))
-            pair = assoc(l, exp, l->env->labels);
+        object_t *pair = lisp_env_resolv(l, l->env, exp);
 
         if(pair != NULL)
             return car(cdr(pair));
 
-        DEBUG(" symbols: %s + %s",
-              l->env ? lisp_print((object_t *) l->env->labels) : "()",
-              env ? lisp_print((object_t *) env->labels) : "()");
+        DEBUG(" (local) symbols: %s",
+              l->env ? lisp_print((object_t *) l->env->labels) : "()");
 
         PANIC("undefined symbol: %s", lisp_print(exp));
     case OBJECT_ERROR:
@@ -141,39 +128,49 @@ static object_t *evatom(lisp_t * l, lisp_env_t * env, object_t * exp) {
     return NULL;
 }
 
-static object_t *evfun(lisp_t * l, lisp_env_t * env, object_t * exp) {
+static object_t *evfun(lisp_t * l, object_t * exp) {
     TRACE("evfun[_, _, %s]", lisp_print(exp));
 
     object_function_t *f = (object_function_t *) car(exp);
 
     // TODO validate args against argdef
 
-    return f->fptr(l, env, evlis(l, env, cdr(exp)));
+    return f->fptr(l, evlis(l, cdr(exp)));
 }
 
-static object_t *evmacr(lisp_t * l, lisp_env_t * env, object_t * exp) {
+static object_t *evmacr(lisp_t * l, object_t * exp) {
     object_macro_t *m = (object_macro_t *) car(exp);
 
     // TODO validate args against argdef
 
     /* Pair argument names to input, create env */
     object_t *env_pair = pair(l, m->args, cdr(exp));
-    lisp_env_t *lenv = lisp_env_new(env, env_pair);
 
-    return lisp_eval(l, lenv, m->expr);
+    l->env = lisp_env_new(l->env, env_pair);
+
+    object_t *r = lisp_eval(l, m->expr);
+
+    l->env = lisp_env_pop(l->env);
+
+    return r;
 }
 
-static object_t *evlamb(lisp_t * l, lisp_env_t * env, object_t * exp) {
+static object_t *evlamb(lisp_t * l, object_t * exp) {
     object_lambda_t *lamb = (object_lambda_t *) car(exp);
 
     // TODO validate args agains argdef
 
     /* Pair argument names to input, create env */
     object_t *args = cdr(exp);
-    object_t *env_pair = pair(l, lamb->args, evlis(l, env, args));
-    lisp_env_t *lenv = lisp_env_new(env, env_pair);
+    object_t *env_pair = pair(l, lamb->args, evlis(l, args));
 
-    return lisp_eval(l, lenv, lamb->expr);
+    l->env = lisp_env_new(l->env, env_pair);
+
+    object_t *r = lisp_eval(l, lamb->expr);
+
+    l->env = lisp_env_pop(l->env);
+
+    return r;
 }
 
 // TODO mother fsck'er!
@@ -194,30 +191,30 @@ static object_t *evprint(object_t * obj) {
     return obj;
 }
 
-static object_t *evloop(lisp_t * l, lisp_env_t * env, object_t * obj) {
+static object_t *evloop(lisp_t * l, object_t * obj) {
     while(1)
-        lisp_eval(l, env, car(cdr(obj)));
+        lisp_eval(l, car(cdr(obj)));
 
     PANIC("LOOP should not end");
 }
 
-static object_t *evcond(lisp_t * l, lisp_env_t * env, object_t * exp) {
+static object_t *evcond(lisp_t * l, object_t * exp) {
     TRACE("evcond[_, _, %s]", lisp_print(exp));
 
     if(exp == NULL)
         return NULL;
 
-    if(lisp_eval(l, env, car(car(exp))))
-        return lisp_eval(l, env, car(cdr(car(exp))));
+    if(lisp_eval(l, car(car(exp))))
+        return lisp_eval(l, car(cdr(car(exp))));
 
-    return evcond(l, env, cdr(exp));
+    return evcond(l, cdr(exp));
 }
 
-static object_t *evlis(lisp_t * l, lisp_env_t * env, object_t * exp) {
+static object_t *evlis(lisp_t * l, object_t * exp) {
     TRACE("evlis[_, _, %s]", lisp_print(exp));
 
     if(exp == NULL)
         return NULL;
 
-    return cons(lisp_eval(l, env, car(exp)), evlis(l, env, cdr(exp)));
+    return cons(lisp_eval(l, car(exp)), evlis(l, cdr(exp)));
 }
