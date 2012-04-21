@@ -114,19 +114,16 @@ static object_t *evatom(lisp_t * l, lisp_env_t * env, object_t * exp) {
         if(eq(l, exp, l->nil))
             return NULL;
 
-        object_t *o = NULL;
+        object_t *pair = NULL;
 
         if(env != NULL)
-            o = car(cdr(assoc(l, exp, env->labels)));
+            pair = assoc(l, exp, env->labels);
 
-        if(o != NULL)
-            return o;
+        if((pair == NULL) && (l->env != NULL))
+            pair = assoc(l, exp, l->env->labels);
 
-        if(l->env != NULL)
-            o = car(cdr(assoc(l, exp, l->env->labels)));
-
-        if(o != NULL)
-            return o;
+        if(pair != NULL)
+            return car(cdr(pair));
 
         DEBUG(" symbols: %s + %s",
               l->env ? lisp_print((object_t *) l->env->labels) : "()",
