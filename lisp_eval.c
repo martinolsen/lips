@@ -111,9 +111,6 @@ static object_t *evatom(lisp_t * l, lisp_env_t * env, object_t * exp) {
         if(eq(l, exp, l->t))
             return l->t;
 
-        if(eq(l, exp, l->nil))
-            return NULL;
-
         object_t *pair = NULL;
 
         if(env != NULL)

@@ -17,7 +17,6 @@ struct lisp_t {
     object_t *readtable;
 
     object_t *t;
-    object_t *nil;
 };
 
 lisp_t *lisp_new();

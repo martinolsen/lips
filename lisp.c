@@ -621,7 +621,10 @@ lisp_t *lisp_new() {
     l->readtable = readtable_new();
 
     l->t = object_symbol_new("T");
-    l->nil = object_symbol_new("NIL");
+
+    object_t *nil = object_symbol_new("NIL");
+
+    l->env->labels = cons(cons(nil, NULL), l->env->labels);
 
     MAKE_FUNCTION(l, "ATOM", atom_fw);
     MAKE_FUNCTION(l, "EQ", eq_fw);
