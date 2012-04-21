@@ -27,33 +27,38 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
         return evatom(l, env, exp);
 
     if(atom(l, car(exp))) {
-        if(eq(l, car(exp), object_symbol_new("QUOTE"))) {
+        object_t *operator = car(exp);
+
+        if(operator == NULL)
+            PANIC("operator is nil");
+
+        if(eq(l, operator, object_symbol_new("QUOTE"))) {
             return car(cdr(exp));
         }
-        else if(eq(l, car(exp), object_symbol_new("LAMBDA"))) {
+        else if(eq(l, operator, object_symbol_new("LAMBDA"))) {
             return lambda(car(cdr(exp)), car(cdr(cdr(exp))));
         }
-        else if(eq(l, car(exp), object_symbol_new("MACRO"))) {
+        else if(eq(l, operator, object_symbol_new("MACRO"))) {
             return macro(car(cdr(exp)), car(cdr(cdr(exp))));
         }
-        else if(eq(l, car(exp), object_symbol_new("LABEL"))) {
+        else if(eq(l, operator, object_symbol_new("LABEL"))) {
             return label(l, env, car(cdr(exp)),
                          lisp_eval(l, env, car(cdr(cdr(exp)))));
         }
-        else if(eq(l, car(exp), object_symbol_new("COND"))) {
+        else if(eq(l, operator, object_symbol_new("COND"))) {
             return evcond(l, env, cdr(exp));
         }
-        else if(eq(l, car(exp), object_symbol_new("PRINT"))) {
+        else if(eq(l, operator, object_symbol_new("PRINT"))) {
             return evprint(car(cdr(exp)));
         }
-        else if(eq(l, car(exp), object_symbol_new("LOOP"))) {
+        else if(eq(l, operator, object_symbol_new("LOOP"))) {
             return evloop(l, env, car(cdr(exp)));
         }
-        else if(eq(l, car(exp), object_symbol_new("READ"))) {
+        else if(eq(l, operator, object_symbol_new("READ"))) {
             return evread(l);
         }
 
-        switch (car(exp)->type) {
+        switch (operator-> type) {
         case OBJECT_LAMBDA:
             return evlamb(l, env, exp);
         case OBJECT_MACRO:
@@ -72,22 +77,23 @@ object_t *lisp_eval(lisp_t * l, lisp_env_t * env, object_t * exp) {
 
         /* operator is not one of the builtins, see if it is defined in env */
         // TODO please come up with something smarter than a split environment
-        object_t *operator = assoc(l, car(exp), env ? env->labels : NULL);
+        object_t *fun =
+            car(cdr(assoc(l, operator, env ? env->labels : NULL)));
 
-        if(operator == NULL)
-            operator = assoc(l, car(exp), l->env->labels);
+        if(fun == NULL)
+            fun = car(cdr(assoc(l, operator, l->env->labels)));
 
-        if(operator == NULL) {
+        if(fun == NULL) {
             DEBUG(" symbols: %s + %s",
                   l->env ? lisp_print((object_t *) l->env->labels) : "()",
                   env ? lisp_print((object_t *) env->labels) : "()");
 
-            ERROR("invalid operator: %s in %s", lisp_print(car(exp)),
+            ERROR("invalid operator: %s in %s", lisp_print(operator),
                   lisp_print(exp));
             return NULL;
         }
 
-        return lisp_eval(l, env, cons(operator, cdr(exp)));
+        return lisp_eval(l, env, cons(fun, cdr(exp)));
     }
     else {
         return lisp_eval(l, env, cons(lisp_eval(l, env, car(exp)), cdr(exp)));
@@ -111,13 +117,13 @@ static object_t *evatom(lisp_t * l, lisp_env_t * env, object_t * exp) {
         object_t *o = NULL;
 
         if(env != NULL)
-            o = assoc(l, exp, env->labels);
+            o = car(cdr(assoc(l, exp, env->labels)));
 
         if(o != NULL)
             return o;
 
         if(l->env != NULL)
-            o = assoc(l, exp, l->env->labels);
+            o = car(cdr(assoc(l, exp, l->env->labels)));
 
         if(o != NULL)
             return o;

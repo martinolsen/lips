@@ -142,13 +142,13 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
  * Lisp definition:
  *
  *   (defun assoc (x y)
- *     (cond ((eq (caar y) x) (cadar y))
+ *     (cond ((eq (caar y) x) (cdar y))
  *             ('t (assoc x (cdr y)))))
  *
  * Example:
  *
  *   (assoc 'b '((a 1) (b 2) (c 3)))
- *   2
+ *   (B 2)
  */
 object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
     TRACE("assoc[_, %s, %s]", lisp_print(x), lisp_print(o));
@@ -163,7 +163,7 @@ object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
         return NULL;
 
     if(eq(l, x, car(car(o))))
-        return car(cdr(car(o)));
+        return car(o);
 
     return assoc(l, x, cdr(o));
 }
@@ -666,7 +666,7 @@ static object_t *macroexpand_1(lisp_t * l, object_t * labels, object_t * form) {
         return cons(form, cons(expanded ? l->t : NULL, NULL));
 
     // do we have a macro form?
-    object_t *m = assoc(l, car(form), l->env->labels);
+    object_t *m = car(cdr(assoc(l, car(form), l->env->labels)));
 
     if(m == NULL || m->type != OBJECT_MACRO)
         return cons(form, cons(expanded ? l->t : NULL, NULL));
@@ -695,7 +695,7 @@ static object_t *macroexpand_hook(lisp_t * l, object_t * labels,
         object_t *x = NULL;
 
         if(atom(l, n)) {
-            x = assoc(l, n, labels);
+            x = car(cdr(assoc(l, n, labels)));
         }
         else {
             object_t *r = hook(l, labels, n, hook);

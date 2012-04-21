@@ -340,14 +340,14 @@ void test_fun_defun() {
 }
 
 void test_fun_assoc() {
-    ASSERT_PRINT("(ASSOC 'A '((A 1) (B 2)))", "1");
-    ASSERT_PRINT("(ASSOC 'A '((A 1) (A 0) (B 2)))", "1");
-    ASSERT_PRINT("(ASSOC 'B '((A 1) (B 2) (C 3)))", "2");
+    ASSERT_PRINT("(ASSOC 'A '((A 1) (B 2)))", "(A 1)");
+    ASSERT_PRINT("(ASSOC 'A '((A 1) (A 0) (B 2)))", "(A 1)");
+    ASSERT_PRINT("(ASSOC 'B '((A 1) (B 2) (C 3)))", "(B 2)");
 }
 
 void test_fun_pair() {
     ASSERT_PRINT("(PAIR '(A B C) '(1 2 3))", "((A 1) (B 2) (C 3))");
-    ASSERT_PRINT("(ASSOC 'B (PAIR '(A B C) '(1 2 3)))", "2");
+    ASSERT_PRINT("(ASSOC 'B (PAIR '(A B C) '(1 2 3)))", "(B 2)");
 }
 
 int setup_fun_suite() {
