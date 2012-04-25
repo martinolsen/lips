@@ -27,37 +27,37 @@ object_t *lisp_eval(lisp_t * l, object_t * exp) {
         return evatom(l, exp);
 
     if(atom(l, car(exp))) {
-        object_t *operator = car(exp);
+        object_t *op = car(exp);
 
-        if(operator == NULL)
+        if(op == NULL)
             PANIC("operator is nil");
 
-        if(eq(l, operator, object_symbol_new("QUOTE"))) {
+        if(eq(l, op, object_symbol_new("QUOTE"))) {
             return car(cdr(exp));
         }
-        else if(eq(l, operator, object_symbol_new("LAMBDA"))) {
+        else if(eq(l, op, object_symbol_new("LAMBDA"))) {
             return lambda(car(cdr(exp)), car(cdr(cdr(exp))));
         }
-        else if(eq(l, operator, object_symbol_new("MACRO"))) {
+        else if(eq(l, op, object_symbol_new("MACRO"))) {
             return macro(car(cdr(exp)), car(cdr(cdr(exp))));
         }
-        else if(eq(l, operator, object_symbol_new("LABEL"))) {
+        else if(eq(l, op, object_symbol_new("LABEL"))) {
             return label(l, car(cdr(exp)), lisp_eval(l, car(cdr(cdr(exp)))));
         }
-        else if(eq(l, operator, object_symbol_new("COND"))) {
+        else if(eq(l, op, object_symbol_new("COND"))) {
             return evcond(l, cdr(exp));
         }
-        else if(eq(l, operator, object_symbol_new("PRINT"))) {
+        else if(eq(l, op, object_symbol_new("PRINT"))) {
             return evprint(car(cdr(exp)));
         }
-        else if(eq(l, operator, object_symbol_new("LOOP"))) {
+        else if(eq(l, op, object_symbol_new("LOOP"))) {
             return evloop(l, car(cdr(exp)));
         }
-        else if(eq(l, operator, object_symbol_new("READ"))) {
+        else if(eq(l, op, object_symbol_new("READ"))) {
             return evread(l);
         }
 
-        switch (operator-> type) {
+        switch (op->type) {
         case OBJECT_LAMBDA:
             return evlamb(l, exp);
         case OBJECT_MACRO:
@@ -74,15 +74,15 @@ object_t *lisp_eval(lisp_t * l, object_t * exp) {
             PANIC("lisp_eval: something is wrong: %d", exp->type);
         }
 
-        /* operator is not one of the builtins, see if it is defined in env */
+        /* op is not one of the builtins, see if it is defined in env */
         // TODO please come up with something smarter than a split environment
-        object_t *fpair = lisp_env_resolv(l, l->env, operator);
+        object_t *fpair = lisp_env_resolv(l, l->env, op);
 
         if(fpair == NULL) {
             DEBUG(" symbols: %s",
                   l->env ? lisp_print((object_t *) l->env->labels) : "()");
 
-            ERROR("invalid operator: %s in %s", lisp_print(operator),
+            ERROR("invalid operator: %s in %s", lisp_print(op),
                   lisp_print(exp));
             return NULL;
         }
