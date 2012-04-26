@@ -42,4 +42,6 @@ lisp_env_t *lisp_env_new(lisp_env_t *, object_t *);
 lisp_env_t *lisp_env_pop(lisp_env_t *);
 object_t *lisp_env_resolv(lisp_t *, lisp_env_t *, object_t *);
 
+object_t *lisp_error(lisp_t *, object_t *);
+
 #endif

@@ -350,12 +350,25 @@ void test_fun_pair() {
     ASSERT_PRINT("(ASSOC 'B (PAIR '(A B C) '(1 2 3)))", "(B 2)");
 }
 
+void test_fun_error() {
+    lisp_t *l = lisp_new();
+
+    teval(l, "(LABEL *ERROR-HANDLER* (LAMBDA (C) (CONS C FOO)))");
+    teval(l, "(DEFUN DO-ERROR (FOO) (ERROR 'X))");
+
+    object_t *r = teval(l, "(DO-ERROR 'BAZ)");
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(r);
+    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(X . BAZ)");
+}
+
 int setup_fun_suite() {
     MAKE_SUITE("Lisp functional tests");
 
     ADD_TEST(test_fun_defun, "DEFUN");
     ADD_TEST(test_fun_assoc, "ASSOC");
     ADD_TEST(test_fun_pair, "PAIR");
+    ADD_TEST(test_fun_error, "ERROR");
 
     return 0;
 }

@@ -726,6 +726,31 @@ static object_t *macroexpand_hook(lisp_t * l, object_t * labels,
     return cons(exphead, cons(expanded ? l->t : NULL, NULL));
 }
 
+object_t *lisp_error(lisp_t * l, object_t * sym) {
+    object_t *handpair =
+        lisp_env_resolv(l, l->env, object_symbol_new("*ERROR-HANDLER*"));
+
+    object_t *handler = car(cdr(handpair));
+
+    if((handler == NULL) || (handler == NULL))
+        PANIC("lisp_error: unhandled error: %s", lisp_print(sym));
+
+    if(handler->type != OBJECT_LAMBDA)
+        PANIC("lisp_error: invalid error handler for %s: %s", lisp_print(sym),
+              lisp_print(handler));
+
+    object_t *args = ((object_lambda_t *) handler)->args;
+    object_t *carg = cons(car(args), cons(sym, NULL));
+
+    l->env->labels = cons(carg, l->env->labels);
+
+    object_t *r = lisp_eval(l, ((object_lambda_t *) handler)->expr);
+
+    ((object_cons_t *) carg)->cdr = NULL;
+
+    return r;
+}
+
 /* TODO:
  *   - Split out print_*, read_*
  */

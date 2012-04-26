@@ -69,3 +69,14 @@ Strings are denoted by enclosing double-quotes
 ### MACRO
 
 Macros are expanded by the reader, just before evaluation.
+
+### ERROR
+
+To indicate an error, simply call *ERROR* with an identifying symbol:
+
+    (ERROR 'MY-ERROR)
+
+To handle errors, define a lambda *&asterisk;error-handler&asterisk;*:
+
+    (LABEL *ERROR-HANDLER*
+      (LABEL (C) (PRINT "Error!")))

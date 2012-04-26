@@ -41,6 +41,9 @@ object_t *lisp_eval(lisp_t * l, object_t * exp) {
         else if(eq(l, op, object_symbol_new("MACRO"))) {
             return macro(car(cdr(exp)), car(cdr(cdr(exp))));
         }
+        else if(eq(l, op, object_symbol_new("ERROR"))) {
+            return lisp_error(l, lisp_eval(l, car(cdr(exp))));
+        }
         else if(eq(l, op, object_symbol_new("LABEL"))) {
             return label(l, car(cdr(exp)), lisp_eval(l, car(cdr(cdr(exp)))));
         }
