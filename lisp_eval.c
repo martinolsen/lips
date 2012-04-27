@@ -113,10 +113,7 @@ static object_t *evatom(lisp_t * l, object_t * exp) {
         if(pair != NULL)
             return car(cdr(pair));
 
-        DEBUG(" (local) symbols: %s",
-              l->env ? lisp_print((object_t *) l->env->labels) : "()");
-
-        PANIC("undefined symbol: %s", lisp_print(exp));
+        return lisp_error(l, object_symbol_new("UNBOUND-SYMBOL"));
     case OBJECT_ERROR:
     case OBJECT_CONS:
     case OBJECT_FUNCTION:

@@ -79,4 +79,15 @@ To indicate an error, simply call `ERROR` with an identifying symbol:
 To handle errors, define a lambda as `*ERROR-HANDLER*`:
 
     (LABEL *ERROR-HANDLER*
-      (LABEL (C) (PRINT "Error!")))
+      (LAMBDA (C) (PRINT "Error!")))
+
+The identifying symbol is passed to the error handler:
+
+    (LABEL *ERROR-HANDLER*
+      (LAMBDA (C)
+        (COND ((EQ C 'MY-ERROR) (PRINT "My bad!")))))
+
+If the error handler returns `NIL`, the error is treated as not handled.
+
+The `UNBOUND-SYMBOL` error accurs when a symbol is not bound to a value
+(defined).

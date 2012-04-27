@@ -362,6 +362,18 @@ void test_fun_error() {
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(X . BAZ)");
 }
 
+void test_fun_error_unbound() {
+    lisp_t *l = lisp_new();
+
+    teval(l, "(LABEL *ERROR-HANDLER* "
+          "(LAMBDA (C) (COND ((EQ C 'UNBOUND-SYMBOL) 42))))");
+
+    object_t *r = teval(l, "(CONS X Y)");
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(r);
+    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(42 . 42)");
+}
+
 int setup_fun_suite() {
     MAKE_SUITE("Lisp functional tests");
 
@@ -369,6 +381,7 @@ int setup_fun_suite() {
     ADD_TEST(test_fun_assoc, "ASSOC");
     ADD_TEST(test_fun_pair, "PAIR");
     ADD_TEST(test_fun_error, "ERROR");
+    ADD_TEST(test_fun_error_unbound, "ERROR - unbound");
 
     return 0;
 }
