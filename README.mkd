@@ -76,7 +76,7 @@ To indicate an error, simply call *ERROR* with an identifying symbol:
 
     (ERROR 'MY-ERROR)
 
-To handle errors, define a lambda *&asterisk;error-handler&asterisk;*:
+To handle errors, define a lambda *\*error-handler\**:
 
     (LABEL *ERROR-HANDLER*
       (LABEL (C) (PRINT "Error!")))
