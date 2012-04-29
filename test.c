@@ -254,6 +254,17 @@ void test_lisp_label() {
     CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
 }
 
+void test_lisp_label_nl() {
+    lisp_t *l = lisp_new();
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(l);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(teval(l, "(LABEL FOO\n42)"));
+
+    object_t *foo = teval(l, "FOO");
+
+    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
+}
+
 void test_lisp_obj_lambda() {
     lisp_t *lisp = lisp_new();
 
@@ -312,6 +323,7 @@ int setup_lisp_suite() {
     ADD_TEST(test_lisp_eq, "lisp EQ");
     ADD_TEST(test_lisp_cond, "lisp COND");
     ADD_TEST(test_lisp_label, "lisp LABEL");
+    ADD_TEST(test_lisp_label_nl, "lisp LABEL with newline after label");
     ADD_TEST(test_lisp_lambda, "lisp LAMBDA");
     ADD_TEST(test_lisp_macro, "lisp MACRO");
     //TODO: ADD_TEST(test_lisp_read, "lisp READ");

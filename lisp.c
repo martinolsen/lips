@@ -508,7 +508,7 @@ object_t *read(lisp_t * l, object_t * stream) {
 
         x = stream_read_char(stream);
 
-        if((x == ' ') || (x == ')')) {  // teminating characters
+        if((x == ' ') || (x == ')') || (x == '\n')) {   // teminating characters
             stream_unread_char(stream, x);
             break;
         }
