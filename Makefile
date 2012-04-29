@@ -12,10 +12,12 @@ tags: $(wildcard *.c) $(wildcard *.h)
 run-test: all
 	./test $(TESTFLAGS)
 
-lips: lips.o repl.o audio.o logger.o object.o lisp_print.o lisp_eval.o lisp.o
+OBJS = logger.o object.o stream.o lisp_print.o lisp_eval.o lisp.o
+
+lips: lips.o repl.o audio.o $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-test: test.o list.o logger.o object.o lisp_print.o lisp_eval.o lisp.o
+test: test.o list.o $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -lcunit -o $@ $^
 
 .c.o: %.c

@@ -10,6 +10,7 @@
 #include "lisp_eval.h"
 #include "list.h"
 #include "object.h"
+#include "stream.h"
 
 static object_t *macroexpand(lisp_t *, object_t *, object_t *);
 static object_t *macroexpand_1(lisp_t *, object_t *, object_t *);
@@ -264,46 +265,6 @@ object_t *macro(object_t * args, object_t * expr) {
           lisp_print(expr));
 
     return (object_t *) object_macro_new(args, expr);
-}
-
-//////////////////////////////////////////////////////////////////////////////
-////////////////////////////// STREAMS & READERS /////////////////////////////
-//////////////////////////////////////////////////////////////////////////////
-
-static int stream_is_eof(object_t * o) {
-    if(!object_isa(o, OBJECT_STREAM))
-        return 1;
-
-    object_stream_t *s = (object_stream_t *) o;
-
-    if(s->buf_idx >= s->buf_sz)
-        return 1;
-
-    return 0;
-}
-
-static char stream_read_char(object_t * o) {
-    if(!object_isa(o, OBJECT_STREAM))
-        return EOF;
-
-    if(stream_is_eof(o))
-        return EOF;
-
-    object_stream_t *s = (object_stream_t *) o;
-
-    return s->buf[s->buf_idx++];
-}
-
-static void stream_unread_char(object_t * o, char x) {
-    if(!object_isa(o, OBJECT_STREAM))
-        PANIC("cannot unread char to non-stream object");
-
-    object_stream_t *s = (object_stream_t *) o;
-
-    if(s->buf_idx == 0)
-        PANIC("unreading beyond beginning of stream not supported");
-
-    s->buf[--s->buf_idx] = x;
 }
 
 /** Read list of objects from input-stream. */
