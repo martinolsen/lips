@@ -7,6 +7,7 @@
 #include "logger.h"
 #include "lisp.h"
 #include "lisp_print.h"
+#include "builtin.h"
 
 static const char *print_integer(object_t *);
 static const char *print_string(object_t *);

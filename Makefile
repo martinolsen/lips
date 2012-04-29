@@ -12,7 +12,7 @@ tags: $(wildcard *.c) $(wildcard *.h)
 run-test: all
 	./test $(TESTFLAGS)
 
-OBJS = logger.o object.o stream.o lisp_print.o lisp_eval.o lisp.o
+OBJS = logger.o object.o stream.o builtin.o lisp_print.o lisp_eval.o lisp.o
 
 lips: lips.o repl.o audio.o $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^

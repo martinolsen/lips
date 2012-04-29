@@ -5,6 +5,7 @@
 #include "lisp.h"
 #include "lisp_eval.h"
 #include "lisp_print.h"
+#include "builtin.h"
 
 static object_t *evatom(lisp_t *, object_t *);
 static object_t *evfun(lisp_t *, object_t *);
