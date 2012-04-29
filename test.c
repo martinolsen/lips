@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "lisp.h"
+#include "stream.h"
 #include "lisp_print.h"
 #include "lisp_eval.h"
 #include "list.h"
@@ -102,14 +103,30 @@ int setup_list_suite() {
  ** Stream suite            **
  *****************************/
 
-void test_lisp_stream_simple() {
-    // TODO
+void test_stream_read() {
+    char *abc = "ABC\n";
+    object_t *os = object_stream_new(abc, strlen(abc));
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(os);
+
+    CU_ASSERT_EQUAL_FATAL(stream_is_eof(os), 0);
+
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'A');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'B');
+
+    stream_unread_char(os, 'B');
+
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'B');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'C');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), '\n');
+
+    CU_ASSERT_EQUAL_FATAL(stream_is_eof(os), 1);
 }
 
-int setup_lisp_stream_suite() {
+int setup_stream_suite() {
     MAKE_SUITE("Lisp stream tests");
 
-    ADD_TEST(test_lisp_stream_simple, "Simple stream");
+    ADD_TEST(test_stream_read, "read stream");
 
     return 0;
 }
@@ -427,7 +444,7 @@ int main(int argc, char **argv) {
     }
 
     // TODO add param
-    setup_lisp_stream_suite();
+    setup_stream_suite();
 
     if(do_all || do_list)
         setup_list_suite();
