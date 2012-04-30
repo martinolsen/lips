@@ -16,7 +16,7 @@
 object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
     TRACE("lisp_read[_, %s, %d]", s, len);
 
-    object_t *stream = object_stream_new(s, len);
+    object_t *stream = stream_string(s, len);
     object_t *o = read(lisp, stream);
 
     return car(macroexpand(lisp, NULL, o));

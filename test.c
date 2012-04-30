@@ -103,9 +103,9 @@ int setup_list_suite() {
  ** Stream suite            **
  *****************************/
 
-void test_stream_read() {
+void test_stream_string() {
     char *abc = "ABC\n";
-    object_t *os = object_stream_new(abc, strlen(abc));
+    object_t *os = stream_string(abc, strlen(abc));
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(os);
 
@@ -115,18 +115,40 @@ void test_stream_read() {
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'B');
 
     stream_unread_char(os, 'B');
-
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'B');
+
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'C');
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), '\n');
 
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), EOF);
+
     CU_ASSERT_EQUAL_FATAL(stream_is_eof(os), 1);
+}
+
+void test_stream_file() {
+    object_t *os = stream_file("README.mkd");
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(os);
+
+    CU_ASSERT_EQUAL_FATAL(stream_is_eof(os), 0);
+
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), '#');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), ' ');
+
+    stream_unread_char(os, ' ');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), ' ');
+
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'L');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'i');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 's');
+    CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'p');
 }
 
 int setup_stream_suite() {
     MAKE_SUITE("Lisp stream tests");
 
-    ADD_TEST(test_stream_read, "read stream");
+    ADD_TEST(test_stream_string, "stream string");
+    ADD_TEST(test_stream_file, "stream file");
 
     return 0;
 }

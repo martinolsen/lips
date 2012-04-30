@@ -113,14 +113,10 @@ object_t *object_symbol_new(char *s) {
     return (object_t *) o;
 }
 
-object_t *object_stream_new(const char *buf, size_t sz) {
+object_t *object_stream_new(FILE * fd) {
     object_stream_t *o = (object_stream_t *) object_new(OBJECT_STREAM);
 
-    o->buf = ALLOC(sz);
-    o->buf_sz = sz;
-    o->buf_idx = 0;
-
-    memcpy(o->buf, buf, sz);
+    o->fd = fd;
 
     return (object_t *) o;
 }

@@ -41,7 +41,7 @@ static const char *print_object(object_t * o) {
     case OBJECT_SYMBOL:
         return ((object_symbol_t *) o)->name;
     case OBJECT_STREAM:
-        return ((object_stream_t *) o)->buf;
+        PANIC("print_object: cannot print stream");
     }
 
     PANIC("print_object: unknwon object of type #%d", o->type);
