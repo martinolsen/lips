@@ -74,6 +74,10 @@ struct object_symbol_t {
 struct object_stream_t {
     object_t object;
     FILE *fd;
+    int (*read) (object_stream_t *);
+    void (*unread) (object_stream_t *, int);
+    void (*write) (object_stream_t *, int);
+    void (*close) (object_stream_t *);
 };
 
 object_t *object_cons_new(object_t *, object_t *);
@@ -83,7 +87,10 @@ object_t *object_macro_new(object_t *, object_t *);
 object_t *object_integer_new(int);
 object_t *object_string_new(char *, size_t);
 object_t *object_symbol_new(char *);
-object_t *object_stream_new(FILE *);
+object_t *object_stream_new(FILE *, int (*)(object_stream_t *),
+                            void (*)(object_stream_t *, int),
+                            void (*)(object_stream_t *, int),
+                            void (*)(object_stream_t *));
 
 int object_isa(object_t *, object_type_t);
 

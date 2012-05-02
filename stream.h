@@ -3,11 +3,15 @@
 
 #include "object.h"
 
-object_t *stream_string(const char *, size_t);
-object_t *stream_file(const char *);
+object_t *istream_mem(const char *, size_t);
+object_t *istream_file(const char *);
+object_t *ostream_mem(void);
+object_t *ostream_file(const char *);
 
-int stream_is_eof(object_t *);
-char stream_read_char(object_t *);
-void stream_unread_char(object_t *, char);
+int stream_eof(object_t *);
+int stream_read_char(object_t *);
+void stream_unread_char(object_t *, int);
+void stream_write_char(object_t *, int);
+void stream_close(object_t *);
 
 #endif

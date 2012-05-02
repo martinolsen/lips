@@ -16,7 +16,7 @@
 object_t *lisp_read(lisp_t * lisp, const char *s, size_t len) {
     TRACE("lisp_read[_, %s, %d]", s, len);
 
-    object_t *stream = stream_string(s, len);
+    object_t *stream = istream_mem(s, len);
     object_t *o = read(lisp, stream);
 
     return car(macroexpand(lisp, NULL, o));
@@ -94,7 +94,7 @@ static object_t *mread_str(lisp_t * l, char x, object_t * stream) {
     size_t str_idx = 0, str_sz = 255;
     char *str = calloc(str_sz + 1, sizeof(char));
 
-    while(!stream_is_eof(stream)) {
+    while(!stream_eof(stream)) {
         if(str_idx > str_sz)
             PANIC("string overflow");
 

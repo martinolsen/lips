@@ -113,10 +113,18 @@ object_t *object_symbol_new(char *s) {
     return (object_t *) o;
 }
 
-object_t *object_stream_new(FILE * fd) {
+object_t *object_stream_new(FILE * fd, int (*read) (object_stream_t *),
+                            void (*unread) (object_stream_t *, int),
+                            void (*write) (object_stream_t *, int),
+                            void (*close) (object_stream_t *)) {
+
     object_stream_t *o = (object_stream_t *) object_new(OBJECT_STREAM);
 
     o->fd = fd;
+    o->read = read;
+    o->unread = unread;
+    o->write = write;
+    o->close = close;
 
     return (object_t *) o;
 }

@@ -227,7 +227,7 @@ object_t *read(lisp_t * l, object_t * stream) {
          */
 
         // if EOF, exit -- TODO not conforming to above spec
-        if(stream_is_eof(stream))
+        if(stream_eof(stream))
             return NULL;
 
         /* 2. If x is an invalid character, an error of type reader-error is
@@ -295,7 +295,7 @@ object_t *read(lisp_t * l, object_t * stream) {
 
     token[token_idx++] = x;
 
-    while(!stream_is_eof(stream)) {
+    while(!stream_eof(stream)) {
         if(token_idx > token_sz)
             PANIC("token overflow");
 

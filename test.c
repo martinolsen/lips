@@ -1,5 +1,6 @@
 #include <CUnit/Basic.h>
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -103,13 +104,13 @@ int setup_list_suite() {
  ** Stream suite            **
  *****************************/
 
-void test_stream_string() {
+void test_stream_mem_read() {
     char *abc = "ABC\n";
-    object_t *os = stream_string(abc, strlen(abc));
+    object_t *os = istream_mem(abc, strlen(abc));
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(os);
 
-    CU_ASSERT_EQUAL_FATAL(stream_is_eof(os), 0);
+    CU_ASSERT_EQUAL_FATAL(stream_eof(os), 0);
 
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'A');
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'B');
@@ -122,15 +123,43 @@ void test_stream_string() {
 
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), EOF);
 
-    CU_ASSERT_EQUAL_FATAL(stream_is_eof(os), 1);
+    CU_ASSERT_EQUAL_FATAL(stream_eof(os), 1);
+
+    stream_close(os);
 }
 
-void test_stream_file() {
-    object_t *os = stream_file("README.mkd");
+void test_stream_file_write() {
+    char filepath[256];
+
+    memset(filepath, 0, sizeof(char) * 256);
+    snprintf(filepath, 255, "/tmp/lips_test.%d.data", getpid());
+    remove(filepath);
+
+    object_t *os = ostream_file(filepath);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(os);
 
-    CU_ASSERT_EQUAL_FATAL(stream_is_eof(os), 0);
+    stream_write_char(os, '#');
+    stream_write_char(os, ' ');
+    stream_write_char(os, 'L');
+    stream_write_char(os, 'i');
+    stream_write_char(os, 's');
+    stream_write_char(os, 'p');
+
+    stream_close(os);
+}
+
+void test_stream_file_read() {
+    char filepath[256];
+
+    memset(filepath, 0, sizeof(char) * 256);
+    snprintf(filepath, 255, "/tmp/lips_test.%d.data", getpid());
+
+    object_t *os = istream_file(filepath);
+
+    CU_ASSERT_PTR_NOT_NULL_FATAL(os);
+
+    CU_ASSERT_EQUAL_FATAL(stream_eof(os), 0);
 
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), '#');
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), ' ');
@@ -142,13 +171,17 @@ void test_stream_file() {
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'i');
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 's');
     CU_ASSERT_EQUAL_FATAL(stream_read_char(os), 'p');
+
+    stream_close(os);
+    remove(filepath);
 }
 
 int setup_stream_suite() {
     MAKE_SUITE("Lisp stream tests");
 
-    ADD_TEST(test_stream_string, "stream string");
-    ADD_TEST(test_stream_file, "stream file");
+    ADD_TEST(test_stream_mem_read, "read string stream");
+    ADD_TEST(test_stream_file_write, "write file stream");
+    ADD_TEST(test_stream_file_read, "read file stream");
 
     return 0;
 }
