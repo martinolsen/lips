@@ -1,0 +1,12 @@
+(PRINT "Registering error handler...")
+
+(LABEL *ERROR-HANDLER*
+  (LAMBDA (C)
+    (COND ((EQ C 'UNBOUND-SYMBOL) (PRINT "Unbound symbol!"))
+          (T (PRINT "Unknown error!"))))
+
+(PRINT "Starting the REPL")
+
+(PRINT *ERROR-HANDLER*)
+
+(LOOP (PRINT (EVAL (READ))))

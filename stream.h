@@ -12,6 +12,7 @@ int stream_eof(object_t *);
 int stream_read_char(object_t *);
 void stream_unread_char(object_t *, int);
 void stream_write_char(object_t *, int);
+void stream_write_str(object_t *, object_t *);
 void stream_close(object_t *);
 
 #endif

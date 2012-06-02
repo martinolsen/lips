@@ -60,10 +60,12 @@ static object_t *teval(lisp_t * l, const char *s) {
  *  Asserts that evaluation succeedes.
  */
 static const char *tprint(lisp_t * l, const char *s) {
-    const char *printed = lisp_print(teval(l, s));
+    object_t *r = lisp_pprint(teval(l, s));
 
-    CU_ASSERT_PTR_NOT_NULL_FATAL(printed);
-    return printed;
+    CU_ASSERT_PTR_NOT_NULL_FATAL(r);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(((object_string_t *)r)->string);
+
+    return ((object_string_t *)r)->string;
 }
 
 /*****************************
@@ -240,7 +242,8 @@ void test_lisp_eval_nil() {
     object_t *o = teval(l, "()");
 
     CU_ASSERT_PTR_NULL_FATAL(o);
-    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(o), "NIL");
+    CU_ASSERT_STRING_EQUAL_FATAL(
+        ((object_string_t *)lisp_pprint(o))->string, "NIL");
 }
 
 void test_lisp_print_atom_integer() {
@@ -323,7 +326,8 @@ void test_lisp_label() {
 
     object_t *foo = teval(l, "FOO");
 
-    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
+    CU_ASSERT_STRING_EQUAL_FATAL(
+        ((object_string_t *)lisp_pprint(foo))->string, "42");
 }
 
 void test_lisp_label_nl() {
@@ -334,7 +338,8 @@ void test_lisp_label_nl() {
 
     object_t *foo = teval(l, "FOO");
 
-    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(foo), "42");
+    CU_ASSERT_STRING_EQUAL_FATAL(
+        ((object_string_t *)lisp_pprint(foo))->string, "42");
 }
 
 void test_lisp_obj_lambda() {
@@ -364,7 +369,8 @@ void test_lisp_macro() {
     object_t *r = teval(l, "(FOO 42)");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(r);
-    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(13 42)");
+    CU_ASSERT_STRING_EQUAL_FATAL(
+        ((object_string_t *)lisp_pprint(r))->string, "(13 42)");
 }
 
 void test_lisp_eval() {
@@ -420,7 +426,8 @@ void test_fun_defun() {
     object_t *r = teval(l, "(FOO 42)");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(r);
-    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(42 42)");
+    CU_ASSERT_STRING_EQUAL_FATAL(
+        ((object_string_t *)lisp_pprint(r))->string, "(42 42)");
 }
 
 void test_fun_assoc() {
@@ -443,7 +450,8 @@ void test_fun_error() {
     object_t *r = teval(l, "(DO-ERROR 'BAZ)");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(r);
-    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(X . BAZ)");
+    CU_ASSERT_STRING_EQUAL_FATAL(
+        ((object_string_t *)lisp_pprint(r))->string, "(X . BAZ)");
 }
 
 void test_fun_error_unbound() {
@@ -455,7 +463,8 @@ void test_fun_error_unbound() {
     object_t *r = teval(l, "(CONS X Y)");
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(r);
-    CU_ASSERT_STRING_EQUAL_FATAL(lisp_print(r), "(42 . 42)");
+    CU_ASSERT_STRING_EQUAL_FATAL(
+        ((object_string_t *)lisp_pprint(r))->string, "(42 . 42)");
 }
 
 int setup_fun_suite() {

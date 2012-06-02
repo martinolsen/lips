@@ -8,15 +8,34 @@
 #include "lisp.h"
 #include "lisp_print.h"
 #include "builtin.h"
+#include "stream.h"
 
 static const char *print_integer(object_t *);
 static const char *print_string(object_t *);
 static const char *print_cons(object_t *);
 static const char *print_object(object_t *);
 
-// Render object to string. Client must free() returned value.
-const char *lisp_print(object_t * object) {
-    return print_object(object);
+/** Render object to a string (using lisp_pprint()) and print it, return it. */
+object_t *lisp_print(lisp_t * l, object_t * obj) {
+    object_t *os_pair =
+        lisp_env_resolv(l, l->env, object_symbol_new("*OUTPUT-STREAM*"));
+
+    if(car(cdr(os_pair)) == NULL)
+        PANIC("ev_print: *OUTPUT-STREAM* not defined");
+
+    object_t *os = lisp_pprint(obj);
+
+    stream_write_str(car(cdr(os_pair)), os);
+    stream_write_char(car(cdr(os_pair)), '\n');
+
+    return obj;
+}
+
+/** Render object to object string */
+object_t *lisp_pprint(object_t * object) {
+    const char *s = print_object(object);
+
+    return object_string_new((char *) s, strlen(s));
 }
 
 static const char *print_object(object_t * o) {

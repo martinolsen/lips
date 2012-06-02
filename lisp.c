@@ -6,7 +6,6 @@
 
 #include "logger.h"
 #include "lisp.h"
-#include "lisp_print.h"
 #include "lisp_eval.h"
 #include "list.h"
 #include "object.h"
@@ -42,9 +41,6 @@ object_t *lisp_env_resolv(lisp_t * l, lisp_env_t * env, object_t * x) {
     if(env == NULL)
         return NULL;
 
-    TRACE("lisp_env_resolv[_, %s, %s]", lisp_print(env->labels),
-          lisp_print(x));
-
     object_t *pairi = env->labels;
 
     while(pairi) {
@@ -59,8 +55,6 @@ object_t *lisp_env_resolv(lisp_t * l, lisp_env_t * env, object_t * x) {
 
 /** Read list of objects from input-stream. */
 static object_t *mread_list(lisp_t * l, char x, object_t * stream) {
-    TRACE("mread_list[_, '%c', »%s«]", x, lisp_print(stream));
-
     if(x != '(')
         PANIC("mread_list cannot read non-list");
 
@@ -250,6 +244,11 @@ lisp_t *lisp_new() {
 
     l->env->labels = cons(cons(nil, NULL), l->env->labels);
 
+    object_t *os_pair = cons(object_symbol_new("*OUTPUT-STREAM*"),
+                             cons(ostream_file("/dev/stdout"), NULL));
+
+    l->env->labels = cons(os_pair, l->env->labels);
+
     MAKE_FUNCTION(l, "ATOM", atom_fw);
     MAKE_FUNCTION(l, "EQ", eq_fw);
     MAKE_FUNCTION(l, "CAR", car_fw);
@@ -272,11 +271,10 @@ object_t *lisp_error(lisp_t * l, object_t * sym) {
     object_t *handler = car(cdr(handpair));
 
     if((handler == NULL) || (handler == NULL))
-        PANIC("lisp_error: unhandled error: %s", lisp_print(sym));
+        PANIC("lisp_error: unhandled error!");
 
     if(handler->type != OBJECT_LAMBDA)
-        PANIC("lisp_error: invalid error handler for %s: %s", lisp_print(sym),
-              lisp_print(handler));
+        PANIC("lisp_error: invalid error handler!");
 
     object_t *args = ((object_lambda_t *) handler)->args;
     object_t *carg = cons(car(args), cons(sym, NULL));

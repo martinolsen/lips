@@ -104,6 +104,20 @@ void stream_write_char(object_t * o, int c) {
     return stream->write(stream, c);
 }
 
+void stream_write_str(object_t * o, object_t *s) {
+    if(!object_isa(o, OBJECT_STREAM))
+        PANIC("cannot write str to non-stream object");
+
+    if(!object_isa(s, OBJECT_STRING))
+        PANIC("cannot write object of non-string type");
+
+    object_string_t *os = (object_string_t *) s;
+
+    size_t osi = 0;
+    while((osi < os->len) && (os->string[osi]))
+        stream_write_char(o, os->string[osi++]);
+}
+
 void stream_close(object_t * o) {
     if(!object_isa(o, OBJECT_STREAM))
         PANIC("cannot close non-stream object");

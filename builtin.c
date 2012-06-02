@@ -5,7 +5,6 @@
 #include "builtin.h"
 #include "logger.h"
 #include "lisp_eval.h"
-#include "lisp_print.h"
 #include "stream.h"
 
 // Return true if OBJECT is anything other than a CONS
@@ -64,13 +63,10 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
     if(a->type != b->type)
         return NULL;
 
-    if(a->type == OBJECT_ERROR)
-        PANIC("eq(%s, %s) - OBJECT_ERROR", lisp_print(a), lisp_print(b));
-
-    if(a->type == OBJECT_CONS)
+    switch (a->type) {
+    case OBJECT_CONS:
         return NULL;
-
-    if(a->type == OBJECT_INTEGER) {
+    case OBJECT_INTEGER:
         if(((object_integer_t *) a)->number ==
            ((object_integer_t *) a)->number) {
 
@@ -78,9 +74,7 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
         }
 
         return NULL;
-    }
-
-    if(a->type == OBJECT_STRING) {
+    case OBJECT_STRING:
         if(0 ==
            strncmp(((object_string_t *) a)->string,
                    ((object_string_t *) a)->string,
@@ -90,9 +84,7 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
         }
 
         return NULL;
-    }
-
-    if(a->type == OBJECT_SYMBOL) {
+    case OBJECT_SYMBOL:
         if(0 == strcmp(((object_symbol_t *) a)->name,
                        ((object_symbol_t *) b)->name)) {
 
@@ -100,9 +92,14 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
         }
 
         return NULL;
+    case OBJECT_ERROR:
+    case OBJECT_FUNCTION:
+    case OBJECT_LAMBDA:
+    case OBJECT_MACRO:
+    case OBJECT_STREAM:
+        PANIC("eq: invalid object type!");
     }
 
-    PANIC("?");
     return NULL;
 }
 
@@ -120,8 +117,6 @@ object_t *eq(lisp_t * l, object_t * a, object_t * b) {
  *   (B 2)
  */
 object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
-    TRACE("assoc[_, %s, %s]", lisp_print(x), lisp_print(o));
-
     if(o == NULL)
         return NULL;
 
@@ -154,8 +149,6 @@ object_t *assoc(lisp_t * l, object_t * x, object_t * o) {
  *    ((a 1) (b 2) (c 3))
  */
 object_t *pair(lisp_t * l, object_t * k, object_t * v) {
-    TRACE("pair[%s@%p, %s@%p]", lisp_print(k), k, lisp_print(v), v);
-
     if((k == NULL) || (v == NULL))
         return NULL;
 
@@ -179,13 +172,11 @@ object_t *pair(lisp_t * l, object_t * k, object_t * v) {
 }
 
 object_t *label(lisp_t * l, object_t * sym, object_t * obj) {
-    TRACE("label(_, %s, %s)", lisp_print(sym), lisp_print(obj));
-
     if(l->env == NULL)
         PANIC("no environment!");
 
-    if(lisp_env_resolv(l, l->env, (object_t *) sym))
-        WARN("label: redefining label %s", lisp_print((object_t *) sym));
+    if(lisp_env_resolv(l, l->env, sym))
+        WARN("label: redefining label!");
 
     object_t *kv = object_cons_new(sym, object_cons_new(obj, NULL));
 
@@ -196,17 +187,11 @@ object_t *label(lisp_t * l, object_t * sym, object_t * obj) {
 
 /** Construct a lambda object from an s-expression. */
 object_t *lambda(object_t * args, object_t * expr) {
-    TRACE("lambda[_, %s, %s]", lisp_print((object_t *) args),
-          lisp_print(expr));
-
     return (object_t *) object_lambda_new(args, expr);
 }
 
 /** Construct a macro object from an s-expression. */
 object_t *macro(object_t * args, object_t * expr) {
-    TRACE("macro[_, %s, %s]", lisp_print((object_t *) args),
-          lisp_print(expr));
-
     return (object_t *) object_macro_new(args, expr);
 }
 

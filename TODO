@@ -1,3 +1,4 @@
+* PRINT should not write directly to stdout, create WRITE instead.
 * VM
 * Exception handling
     * invalid operators, syntax errors, etc

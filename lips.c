@@ -3,7 +3,6 @@
 
 #include "lisp.h"
 #include "lisp_eval.h"
-#include "lisp_print.h"
 
 int main(void) {
     FILE *repl_file = fopen("repl.lips", "r");

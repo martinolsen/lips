@@ -6,21 +6,19 @@
 #include "lisp_eval.h"
 #include "lisp_print.h"
 #include "builtin.h"
+#include "stream.h"
 
 static object_t *evatom(lisp_t *, object_t *);
 static object_t *evfun(lisp_t *, object_t *);
 static object_t *evmacr(lisp_t *, object_t *);
 static object_t *evlamb(lisp_t *, object_t *);
 static object_t *evread(lisp_t *);
-static object_t *evprint(object_t *);
 static object_t *evloop(lisp_t *, object_t *);
 static object_t *evcond(lisp_t *, object_t *);
 static object_t *evlis(lisp_t *, object_t *);
 
 /** Evaluate a LISP form.  */
 object_t *lisp_eval(lisp_t * l, object_t * exp) {
-    TRACE("lisp_eval[_, %s]", lisp_print(exp));
-
     if(exp == NULL)
         return NULL;
 
@@ -52,7 +50,7 @@ object_t *lisp_eval(lisp_t * l, object_t * exp) {
             return evcond(l, cdr(exp));
         }
         else if(eq(l, op, object_symbol_new("PRINT"))) {
-            return evprint(car(cdr(exp)));
+            return lisp_print(l, lisp_eval(l, car(cdr(exp))));
         }
         else if(eq(l, op, object_symbol_new("LOOP"))) {
             return evloop(l, car(cdr(exp)));
@@ -83,11 +81,8 @@ object_t *lisp_eval(lisp_t * l, object_t * exp) {
         object_t *fpair = lisp_env_resolv(l, l->env, op);
 
         if(fpair == NULL) {
-            DEBUG(" symbols: %s",
-                  l->env ? lisp_print((object_t *) l->env->labels) : "()");
+            ERROR("invalid operator!");
 
-            ERROR("invalid operator: %s in %s", lisp_print(op),
-                  lisp_print(exp));
             return NULL;
         }
 
@@ -97,7 +92,7 @@ object_t *lisp_eval(lisp_t * l, object_t * exp) {
         return lisp_eval(l, cons(lisp_eval(l, car(exp)), cdr(exp)));
     }
 
-    PANIC("lisp_eval: not yet implemented: %s", lisp_print(exp));
+    PANIC("lisp_eval: not yet implemented!");
 }
 
 static object_t *evatom(lisp_t * l, object_t * exp) {
@@ -130,8 +125,6 @@ static object_t *evatom(lisp_t * l, object_t * exp) {
 }
 
 static object_t *evfun(lisp_t * l, object_t * exp) {
-    TRACE("evfun[_, _, %s]", lisp_print(exp));
-
     object_function_t *f = (object_function_t *) car(exp);
 
     // TODO validate args against argdef
@@ -186,12 +179,6 @@ static object_t *evread(lisp_t * l) {
     return NULL;
 }
 
-static object_t *evprint(object_t * obj) {
-    lisp_print(obj);
-
-    return obj;
-}
-
 static object_t *evloop(lisp_t * l, object_t * obj) {
     while(1)
         lisp_eval(l, car(cdr(obj)));
@@ -200,8 +187,6 @@ static object_t *evloop(lisp_t * l, object_t * obj) {
 }
 
 static object_t *evcond(lisp_t * l, object_t * exp) {
-    TRACE("evcond[_, _, %s]", lisp_print(exp));
-
     if(exp == NULL)
         return NULL;
 
@@ -212,8 +197,6 @@ static object_t *evcond(lisp_t * l, object_t * exp) {
 }
 
 static object_t *evlis(lisp_t * l, object_t * exp) {
-    TRACE("evlis[_, _, %s]", lisp_print(exp));
-
     if(exp == NULL)
         return NULL;
 

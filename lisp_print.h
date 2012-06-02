@@ -2,7 +2,9 @@
 #define __LISP_PRINT_H
 
 #include "lisp.h"
+#include "object.h"
 
-const char *lisp_print(object_t *);
+object_t *lisp_print(lisp_t *, object_t *);
+object_t *lisp_pprint(object_t *);
 
 #endif
