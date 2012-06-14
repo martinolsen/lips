@@ -159,7 +159,7 @@ object_t *pair(lisp_t * l, object_t * k, object_t * v) {
         return NULL;
 
     // TODO - make list(object_t *...) helper
-    object_t *head = object_cons_new(car(k), object_cons_new(car(v), NULL));
+    object_t *head = cons(car(k), cons(car(v), NULL));
     object_t *tail = pair(l, cdr(k), cdr(v));
 
     if(car(head) == NULL)
@@ -168,7 +168,7 @@ object_t *pair(lisp_t * l, object_t * k, object_t * v) {
     if(car(tail) == NULL)
         tail = NULL;
 
-    return object_cons_new(head, tail);
+    return cons(head, tail);
 }
 
 object_t *label(lisp_t * l, object_t * sym, object_t * obj) {
@@ -178,9 +178,9 @@ object_t *label(lisp_t * l, object_t * sym, object_t * obj) {
     if(lisp_env_resolv(l, l->env, sym))
         WARN("label: redefining label!");
 
-    object_t *kv = object_cons_new(sym, object_cons_new(obj, NULL));
+    object_t *kv = cons(sym, cons(obj, NULL));
 
-    l->env->labels = object_cons_new(kv, l->env->labels);
+    l->env->labels = cons(kv, l->env->labels);
 
     return obj;
 }
