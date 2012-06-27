@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic
-LDFLAGS = -lm -lao -lreadline
+LDFLAGS = -lm -lreadline
 
 .PHONY: run-test clean all tags
 
@@ -14,7 +14,7 @@ run-test: all
 
 OBJS = logger.o object.o stream.o builtin.o lisp_print.o lisp_eval.o lisp.o
 
-lips: lips.o repl.o audio.o $(OBJS)
+lips: lips.o repl.o $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 test: test.o list.o $(OBJS)

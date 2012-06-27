@@ -3,7 +3,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef __linux__
 #include <execinfo.h>
+#endif
 
 #define TRACE(f, args...) do { \
     /*logger("trace", __FILE__, __LINE__, f, ##args);*/ } while(0);
@@ -23,6 +26,8 @@
 
 #define BACKTRACE_MAX 100
 
+#ifdef __linux__
+
 #define BACKTRACE do { \
     void *buffer[BACKTRACE_MAX]; \
     int j, nptrs = backtrace(buffer, BACKTRACE_MAX); \
@@ -31,6 +36,12 @@
     if(strings == NULL) { perror("backtrace_symbols"); exit(EXIT_FAILURE); } \
     for (j = 0; j < nptrs; j++) printf("%s\n", strings[j]); \
     free(strings); } while(0);
+
+#else // __linux__
+
+#define BACKTRACE do { printf("(backtrace not available)"); } while(0);
+
+#endif // __linux__
 
 int logger(const char *, const char *, const int, const char *, ...);
 
