@@ -68,24 +68,24 @@ static const char *print_object(object_t * o) {
     return NULL;
 }
 
-#define ASSERT_ISA(o, t, m) if((o == NULL) || (o->type != t)) PANIC(m);
-
 static const char *print_string(object_t * o) {
-    ASSERT_ISA(o, OBJECT_STRING, "print_string: arg is not string!");
+    if(!object_isa(o, OBJECT_STRING))
+        PANIC("print_string: arg is not string!");
 
     object_string_t *str = (object_string_t *) o;
 
-    const size_t len = str->len + 3;
+    const size_t len = str->len + 1;
     char *s = calloc(len, sizeof(char));
 
-    if(snprintf(s, len, "\"%s\"", str->string) == 0)
+    if(snprintf(s, len, "%s", str->string) == 0)
         PANIC("print_string: could not write string %s", str->string);
 
     return s;
 }
 
 static const char *print_integer(object_t * o) {
-    ASSERT_ISA(o, OBJECT_INTEGER, "print_integer: arg is not integer!");
+    if(!object_isa(o, OBJECT_INTEGER))
+        PANIC("print_integer: arg is not integer!");
 
     const size_t len = 15;
     char *s = calloc(len + 1, sizeof(char));
