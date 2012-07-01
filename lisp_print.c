@@ -33,9 +33,9 @@ object_t *lisp_print(lisp_t * l, object_t * obj) {
 
 /** Render object to object string */
 object_t *lisp_pprint(object_t * object) {
-    const char *s = print_object(object);
+    char *s = (char *) print_object(object);
 
-    return object_string_new((char *) s, strlen(s));
+    return object_string_new(s, strlen(s));
 }
 
 static const char *print_object(object_t * o) {

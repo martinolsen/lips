@@ -253,7 +253,7 @@ void test_lisp_print_atom_integer() {
 void test_lisp_print_atom_string() {
     const char *s = "\"hello, world!\"";
 
-    ASSERT_PRINT(s, s);
+    ASSERT_PRINT(s, "hello, world!");
 }
 
 void test_lisp_print_list_nil() {
@@ -454,6 +454,12 @@ void test_fun_error() {
         ((object_string_t *)lisp_pprint(r))->string, "(X . BAZ)");
 }
 
+void test_fun_format() {
+    ASSERT_PRINT("(FORMAT \"~a\" 123)", "123");
+    ASSERT_PRINT("(FORMAT \"~a\" \"aBc\")", "aBc");
+    ASSERT_PRINT("(FORMAT \"~a~a\" 'A 1)", "A1");
+}
+
 void test_fun_error_unbound() {
     lisp_t *l = lisp_new();
 
@@ -474,6 +480,7 @@ int setup_fun_suite() {
     ADD_TEST(test_fun_assoc, "ASSOC");
     ADD_TEST(test_fun_pair, "PAIR");
     ADD_TEST(test_fun_error, "ERROR");
+    ADD_TEST(test_fun_format, "FORMAT");
     ADD_TEST(test_fun_error_unbound, "ERROR - unbound");
 
     return 0;
