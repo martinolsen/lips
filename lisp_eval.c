@@ -5,6 +5,7 @@
 #include "lisp.h"
 #include "lisp_eval.h"
 #include "lisp_print.h"
+#include "lisp_read.h"
 #include "builtin.h"
 #include "stream.h"
 

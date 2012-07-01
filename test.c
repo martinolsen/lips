@@ -9,6 +9,7 @@
 #include "stream.h"
 #include "lisp_print.h"
 #include "lisp_eval.h"
+#include "lisp_read.h"
 #include "list.h"
 
 #define ARG_TEST_LIST       "--only-list"

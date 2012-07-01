@@ -21,8 +21,6 @@ struct lisp_t {
 
 lisp_t *lisp_new();
 
-object_t *lisp_read(lisp_t *, const char *, size_t);
-
 lisp_env_t *lisp_env_new(lisp_env_t *, object_t *);
 lisp_env_t *lisp_env_pop(lisp_env_t *);
 object_t *lisp_env_resolv(lisp_t *, lisp_env_t *, object_t *);

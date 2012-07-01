@@ -6,6 +6,7 @@
 #include "repl.h"
 #include "lisp.h"
 #include "lisp_eval.h"
+#include "lisp_read.h"
 
 #define BUFSZ 1024
 #define REPL_EXPR "(LOOP (PRINT (EVAL (READ))))"
