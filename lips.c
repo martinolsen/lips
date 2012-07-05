@@ -5,8 +5,10 @@
 #include "lisp_eval.h"
 #include "lisp_read.h"
 
-int main(void) {
-    FILE *repl_file = fopen("repl.lips", "r");
+void eval_file(lisp_t *lisp, char *filename) {
+    FILE *repl_file = fopen(filename, "r");
+
+    fprintf(stderr, "%s ...\n", filename);
 
     if(repl_file == NULL) {
         perror("fopen");
@@ -28,8 +30,6 @@ int main(void) {
     fread(buf, sizeof(char), bufsz, repl_file);
     fclose(repl_file);
 
-    lisp_t *lisp = lisp_new();
-
     size_t i = 0;
     char pprev = 0, prev = 0;
 
@@ -42,6 +42,15 @@ int main(void) {
     }
 
     free(buf);
+}
+
+int main(int argc, char **argv) {
+    lisp_t *lisp = lisp_new();
+
+    for(int i = 1; i < argc; i++)
+        eval_file(lisp, argv[i]);
+
+    eval_file(lisp, "repl.lips");
 
     exit(EXIT_SUCCESS);
 }
