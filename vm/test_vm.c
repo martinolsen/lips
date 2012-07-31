@@ -79,7 +79,7 @@ int setup_vm_suite() {
     return 0;
 }
 
-int main(int argc __attribute__ ((__unused__)), char **argv __attribute__ ((__unused__))) {
+int main(void) {
     if(CUE_SUCCESS != CU_initialize_registry())
         return CU_get_error();
 
