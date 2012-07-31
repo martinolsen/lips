@@ -99,7 +99,7 @@ void vm_run(vm_t *vm) {
         switch(vm_decode_op(in)) {
             case VM_OP_NOP:
                 break;
-            case VM_OP_BRK:
+            case VM_OP_RET:
                 return;
             case VM_OP_JMP:
                 vm_pc_set(vm, vm_reg_get(vm, vm_decode_dst(in)));

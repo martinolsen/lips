@@ -19,7 +19,7 @@ void test_vm() {
         vm_encode(VM_OP_MOV, 0, 40, 0),
         vm_encode(VM_OP_MOV, 1, 2, 0),
         vm_encode(VM_OP_ADD, 0, 0, 1),
-        vm_encode(VM_OP_BRK, 0, 0, 0)};
+        vm_encode(VM_OP_RET, 0, 0, 0)};
 
     for(int i = 0; i < 4; i++)
         vm_poke(vm, i, instructions[i]);
@@ -34,7 +34,7 @@ void test_as() {
             "mov %r0, 40\n"
             "mov %r1, 2\n"
             "add %r0, %r0, %r1\n"
-            "brk");
+            "ret");
     CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
 
     vm_run(vm);
@@ -43,7 +43,7 @@ void test_as() {
 }
 
 void test_vm_brk() {
-    vm_t *vm = vm_as("brk\nmov %r0, 42");
+    vm_t *vm = vm_as("ret\nmov %r0, 42");
     CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
 
     vm_run(vm);
@@ -56,7 +56,7 @@ void test_vm_jmp() {
             "mov %r0, 3\n"
             "jmp %r0\n"
             "mov %r0, 42\n"
-            "brk\n");
+            "ret\n");
     CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
 
     vm_run(vm);
@@ -73,7 +73,7 @@ int setup_vm_suite() {
 
     ADD_TEST(suite, test_vm, "Test VM");
     ADD_TEST(suite, test_as, "Test VM assembler");
-    ADD_TEST(suite, test_vm_brk, "Test VM - BRK");
+    ADD_TEST(suite, test_vm_brk, "Test VM - RET");
     ADD_TEST(suite, test_vm_jmp, "Test VM - JMP");
 
     return 0;

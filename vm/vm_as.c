@@ -75,8 +75,8 @@ vm_t *vm_as(const char *code) {
 
             vm_poke(vm, datai++, vm_encode(VM_OP_ADD, dst, a, b));
             continue;
-        } else if(vm_as_expect(code, &codei, "brk")) {
-            vm_poke(vm, datai++, vm_encode(VM_OP_BRK, 0, 0, 0));
+        } else if(vm_as_expect(code, &codei, "ret")) {
+            vm_poke(vm, datai++, vm_encode(VM_OP_RET, 0, 0, 0));
             continue;
         } else if(vm_as_expect(code, &codei, "jmp")) {
             while(code[codei] == ' ')
