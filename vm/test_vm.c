@@ -42,7 +42,7 @@ void test_as() {
     CU_ASSERT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
 }
 
-void test_vm_brk() {
+void test_vm_ret() {
     vm_t *vm = vm_as("ret\nmov %r0, 42");
     CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
 
@@ -73,7 +73,7 @@ int setup_vm_suite() {
 
     ADD_TEST(suite, test_vm, "Test VM");
     ADD_TEST(suite, test_as, "Test VM assembler");
-    ADD_TEST(suite, test_vm_brk, "Test VM - RET");
+    ADD_TEST(suite, test_vm_ret, "Test VM - RET");
     ADD_TEST(suite, test_vm_jmp, "Test VM - JMP");
 
     return 0;
