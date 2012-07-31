@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <string.h>
 
 #include "vm_as.h"
 #include "vm.h"
@@ -23,6 +24,7 @@ typedef struct {
 } ast_node_arg_t;
 
 typedef struct {
+    char *label;
     vm_op_t op;
     size_t arg_count;
     ast_node_arg_t args[AST_NODE_ARGS_MAX];
@@ -39,15 +41,6 @@ static ast_node_t *read_ast_node(const char *, size_t *);
 static ll_node_t *read_ast(const char *);
 static bool resolve_labels(ll_node_t *);
 
-static bool resolve_labels(ll_node_t *node) {
-    while(node != NULL) {
-
-        node = node->next;
-    }
-
-    return false;
-}
-
 vm_t *vm_as(const char *code) {
     ll_node_t *ll = read_ast(code);
 
@@ -56,7 +49,7 @@ vm_t *vm_as(const char *code) {
         exit(EXIT_FAILURE);
     }
 
-    if(0 && !resolve_labels(ll)) {
+    if(!resolve_labels(ll)) {
         fprintf(stderr, "vm_as: could not resolve all labels!\n");
         exit(EXIT_FAILURE);
     }
@@ -222,21 +215,41 @@ static ast_node_t *read_ast_node(const char *code, size_t *codei) {
     while(isspace(code[*codei]) || code[*codei] == '\n')
         (*codei)++;
 
-    if(code[*codei] == 0)
-        return NULL;
-
-    /*
-    size_t node_sz = sizeof(ast_node_t)
-        + (AST_NODE_ARGS_MAX * sizeof(ast_node_arg_t));
-        */
-
     ast_node_t *node = calloc(1, sizeof(ast_node_t));
     if(node == NULL) {
         perror("calloc");
         exit(EXIT_FAILURE);
     }
 
-    // Read label - TODO
+    // Read label
+    size_t tmpi = *codei;
+    while(isalnum(code[tmpi++])) {
+        if(code[tmpi] == ':') {
+            char *label = calloc(AST_NODE_LABEL_MAX, sizeof(char));
+            if(label == NULL) {
+                perror("calloc");
+                exit(EXIT_FAILURE);
+            }
+
+            size_t labeli = 0;
+            while(code[*codei] != ':')
+                label[labeli++] = code[(*codei)++];
+
+            (*codei)++;
+
+            while(isspace(code[*codei]) || code[*codei] == '\n')
+                (*codei)++;
+
+            node->label = label;
+
+            break;
+        }
+    }
+
+    if(code[*codei] == 0) {
+        free(node);
+        return NULL;
+    }
 
     // Read op
     if(vm_as_expect(code, codei, "mov"))
@@ -302,17 +315,13 @@ static ast_node_t *read_ast_node(const char *code, size_t *codei) {
 
             size_t argi = 0;
             while(isalnum(code[*codei])) {
-                if(argi > AST_NODE_LABEL_MAX) {
+                if(argi >= AST_NODE_LABEL_MAX) {
                     fprintf(stderr, "read_ast_node: label overflow at %d\n",
                             (int) *codei);
                     exit(EXIT_FAILURE);
                 }
 
-                node->args[node->arg_count].label[argi] =
-                    code[(*codei) + argi];
-
-                (*codei)++;
-                argi++;
+                node->args[node->arg_count].label[argi++] = code[(*codei)++];
             }
         } else {
             fprintf(stderr, "read_ast_node: unknown argument type at %d (%c)\n",
@@ -327,4 +336,44 @@ static ast_node_t *read_ast_node(const char *code, size_t *codei) {
     // Read comment / EOL
 
     return node;
+}
+
+static bool resolve_labels(ll_node_t *first) {
+    ll_node_t *this = first;
+
+    while(this != NULL) {
+        ast_node_t *node = (ast_node_t *)this->this;
+
+        for(int i = 0; i < AST_NODE_ARGS_MAX; i++) {
+            if(node->args[i].type != AST_NODE_ARG_LABEL)
+                continue;
+
+            int pos = 0;
+            ll_node_t *tmp_this = first;
+            while(tmp_this) {
+                ast_node_t *tmp_node = (ast_node_t *)tmp_this->this;
+
+                if(tmp_node->label != NULL) {
+                    if(strcmp(node->args[i].label, tmp_node->label) == 0) {
+                        node->args[i].type = AST_NODE_ARG_IMM;
+                        node->args[i].imm = pos;
+
+                        break;
+                    }
+                }
+
+                pos++;
+                tmp_this = tmp_this->next;
+            }
+
+            if(node->args[i].type == AST_NODE_ARG_LABEL) {
+                fprintf(stderr, "unresolved label: %s\n", node->args[i].label);
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        this = this->next;
+    }
+
+    return true;
 }

@@ -64,6 +64,19 @@ void test_vm_jmp() {
     CU_ASSERT_NOT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
 }
 
+void test_vm_jmp_label() {
+    vm_t *vm = vm_as(
+            "mov %r0, lbl\n"
+            "jmp %r0\n"
+            "mov %r0, 42\n"
+            "lbl: ret\n");
+    CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
+
+    vm_run(vm);
+
+    CU_ASSERT_NOT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
+}
+
 int setup_vm_suite() {
     CU_pSuite suite = CU_add_suite("VM", NULL, NULL); \
     if(NULL == suite) {
@@ -75,6 +88,7 @@ int setup_vm_suite() {
     ADD_TEST(suite, test_as, "Test VM assembler");
     ADD_TEST(suite, test_vm_ret, "Test VM - RET");
     ADD_TEST(suite, test_vm_jmp, "Test VM - JMP");
+    ADD_TEST(suite, test_vm_jmp_label, "Test VM - JMP w/label");
 
     return 0;
 }
