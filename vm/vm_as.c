@@ -6,6 +6,7 @@
 #include "vm.h"
 
 static int vm_as_read_reg(const char *, size_t *);
+static bool vm_as_expect(const char *, size_t *, const char *);
 
 vm_t *vm_as(const char *code) {
     size_t codei = 0;
@@ -17,20 +18,18 @@ vm_t *vm_as(const char *code) {
         while(code[codei] == ' ' || code[codei] == '\n')
             codei++;
 
-        if(code[codei] == 'm' && code[codei+1] == 'o' && code[codei+2] == 'v') {
-            codei += 3;
-
+        if(code[codei] == 0) {
+            break;
+        } else if(vm_as_expect(code, &codei, "mov")) {
             while(code[codei] == ' ')
                 codei++;
 
             int dst = vm_as_read_reg(code, &codei);
 
-            if(code[codei] != ',') {
+            if(!vm_as_expect(code, &codei, ",")) {
                 fprintf(stderr, "vm_as: expected ',' at %d\n", (int) codei);
                 exit(EXIT_FAILURE);
             }
-
-            codei += 1;
 
             while(code[codei] == ' ')
                 codei++;
@@ -48,32 +47,26 @@ vm_t *vm_as(const char *code) {
 
             vm_poke(vm, datai++, vm_encode(VM_OP_MOV, dst, src, 0));
             continue;
-        } else if(code[codei] == 'a' && code[codei+1] == 'd' && code[codei+2] == 'd') {
-            codei += 3;
-
+        } else if(vm_as_expect(code, &codei, "add")) {
             while(code[codei] == ' ')
                 codei++;
 
             int dst = vm_as_read_reg(code, &codei);
 
-            if(code[codei] != ',') {
+            if(!vm_as_expect(code, &codei, ",")) {
                 fprintf(stderr, "vm_as: expected ',' at %d\n", (int) codei);
                 exit(EXIT_FAILURE);
             }
-
-            codei += 1;
 
             while(code[codei] == ' ')
                 codei++;
 
             int a = vm_as_read_reg(code, &codei);
 
-            if(code[codei] != ',') {
+            if(!vm_as_expect(code, &codei, ",")) {
                 fprintf(stderr, "vm_as: expected ',' at %d\n", (int) codei);
                 exit(EXIT_FAILURE);
             }
-
-            codei += 1;
 
             while(code[codei] == ' ')
                 codei++;
@@ -82,14 +75,10 @@ vm_t *vm_as(const char *code) {
 
             vm_poke(vm, datai++, vm_encode(VM_OP_ADD, dst, a, b));
             continue;
-        } else if(code[codei] == 'b' && code[codei+1] == 'r' && code[codei+2] == 'k') {
-            codei += 3;
-
+        } else if(vm_as_expect(code, &codei, "brk")) {
             vm_poke(vm, datai++, vm_encode(VM_OP_BRK, 0, 0, 0));
             continue;
-        } else if(code[codei] == 'j' && code[codei+1] == 'm' && code[codei+2] == 'p') {
-            code += 3;
-
+        } else if(vm_as_expect(code, &codei, "jmp")) {
             while(code[codei] == ' ')
                 codei++;
 
@@ -97,15 +86,12 @@ vm_t *vm_as(const char *code) {
 
             vm_poke(vm, datai++, vm_encode(VM_OP_JMP, dst, 0, 0));
             continue;
+        } else {
+            printf("vm_as: error at %d (0x%02x/%c)\n",
+                    (int) codei, code[codei], code[codei]);
+
+            exit(EXIT_FAILURE);
         }
-
-        if(code[codei] == 0)
-            break;
-
-        printf("vm_as: error at %d (0x%02x/%c)\n",
-                (int) codei, code[codei], code[codei]);
-
-        exit(EXIT_FAILURE);
     }
 
     return vm;
@@ -127,4 +113,17 @@ static int vm_as_read_reg(const char *code, size_t *codei) {
     *codei += 1;
 
     return num;
+}
+
+static bool vm_as_expect(const char *code, size_t *codei, const char *exp) {
+    size_t expi = 0, tmpi = *codei;
+
+    while(code[tmpi++] == exp[expi++]) {
+        if(exp[expi] == 0) {
+            *codei = tmpi;
+            return true;
+        }
+    }
+
+    return false;
 }
