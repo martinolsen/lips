@@ -2,9 +2,9 @@ CC = gcc
 CFLAGS = -std=c99 -Wall -Werror -Wextra -g -rdynamic
 LDFLAGS = 
 
-OBJS = vm.o
+OBJS = vm.o vm_as.o
 
-.PHONY: test
+.PHONY: 
 
 all: vm
 

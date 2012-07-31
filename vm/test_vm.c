@@ -6,6 +6,10 @@
 #include <string.h>
 
 #include "vm.h"
+#include "vm_as.h"
+
+#define ADD_TEST(s, fn, n) if(NULL == CU_add_test(s, n, fn)) \
+        { CU_cleanup_registry(); return CU_get_error(); }
 
 void test_vm() {
     vm_t *vm = vm_new(16);
@@ -26,12 +30,38 @@ void test_vm() {
 }
 
 void test_as() {
-    vm_t *vm = vm_as("mov %r0, 40\nmov %r1, 2\nadd %r0, %r0, %r1\nbrk");
+    vm_t *vm = vm_as(
+            "mov %r0, 40\n"
+            "mov %r1, 2\n"
+            "add %r0, %r0, %r1\n"
+            "brk");
     CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
 
     vm_run(vm);
 
     CU_ASSERT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
+}
+
+void test_vm_brk() {
+    vm_t *vm = vm_as("brk\nmov %r0, 42");
+    CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
+
+    vm_run(vm);
+
+    CU_ASSERT_NOT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
+}
+
+void test_vm_jmp() {
+    vm_t *vm = vm_as(
+            "mov %r0, 3\n"
+            "jmp %r0\n"
+            "mov %r0, 42\n"
+            "brk\n");
+    CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
+
+    vm_run(vm);
+
+    CU_ASSERT_NOT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
 }
 
 int setup_vm_suite() {
@@ -41,15 +71,10 @@ int setup_vm_suite() {
         return CU_get_error();
     }
 
-    if(NULL == CU_add_test(suite, "Test VM", test_vm)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
-
-    if(NULL == CU_add_test(suite, "Test assembler", test_as)) {
-        CU_cleanup_registry();
-        return CU_get_error();
-    }
+    ADD_TEST(suite, test_vm, "Test VM");
+    ADD_TEST(suite, test_as, "Test VM assembler");
+    ADD_TEST(suite, test_vm_brk, "Test VM - BRK");
+    ADD_TEST(suite, test_vm_jmp, "Test VM - JMP");
 
     return 0;
 }
