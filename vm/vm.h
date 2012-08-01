@@ -4,21 +4,31 @@
 #define VM_REGS 16
 
 typedef enum {
-    VM_OP_NOP = 0x00,
-    VM_OP_RET = 0x01,
-    VM_OP_JMP = 0x04,
-    VM_OP_MOV = 0x08,
-    VM_OP_ADD = 0x10,
+    VM_OP_NOP  = 0x00,
+    VM_OP_CALL = 0x01,
+    VM_OP_RET  = 0x02,
+    VM_OP_JMP  = 0x04,
+    VM_OP_MOV  = 0x08,
+    VM_OP_ADD  = 0x80,
 } vm_op_t;
 
-typedef struct {
+typedef struct vm_t vm_t;
+typedef struct vm_frame_t vm_frame_t;
+
+struct vm_frame_t {
+    size_t pc;
+    vm_frame_t *pp;
+};
+
+struct vm_t {
     int *data;
     size_t data_sz;
     int regs[VM_REGS];
-    size_t pc;
-} vm_t;
+    vm_frame_t *fp;
+};
 
 vm_t *vm_new(size_t);
+vm_frame_t *vm_frame_new(vm_frame_t *, int);
 
 void vm_poke(vm_t *, size_t, int);
 

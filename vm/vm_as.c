@@ -69,7 +69,7 @@ vm_t *vm_as(const char *code) {
 
                 if(node->args[0].type != AST_NODE_ARG_REG ||
                         node->args[1].type != AST_NODE_ARG_IMM) {
-                    fprintf(stderr, "vm_as: 'mov' requires reg/imm arguemtns!\n");
+                    fprintf(stderr, "vm_as: 'mov' requires reg/imm arguments!\n");
                     exit(EXIT_FAILURE);
                 }
 
@@ -89,7 +89,7 @@ vm_t *vm_as(const char *code) {
                 if(node->args[0].type != AST_NODE_ARG_REG ||
                         node->args[1].type != AST_NODE_ARG_REG ||
                         node->args[2].type != AST_NODE_ARG_REG) {
-                    fprintf(stderr, "vm_as: 'add' requires reg arguemtns!\n");
+                    fprintf(stderr, "vm_as: 'add' requires reg arguments!\n");
                     exit(EXIT_FAILURE);
                 }
 
@@ -102,12 +102,12 @@ vm_t *vm_as(const char *code) {
                 break;
             case VM_OP_JMP:
                 if(node->arg_count != 1) {
-                    fprintf(stderr, "vm_as: 'jmp' requires two arguements!\n");
+                    fprintf(stderr, "vm_as: 'jmp' requires two arguments!\n");
                     exit(EXIT_FAILURE);
                 }
 
                 if(node->args[0].type != AST_NODE_ARG_REG) {
-                    fprintf(stderr, "vm_as: 'jmp' requires reg arguemtns!\n");
+                    fprintf(stderr, "vm_as: 'jmp' requires reg arguments!\n");
                     exit(EXIT_FAILURE);
                 }
 
@@ -116,16 +116,30 @@ vm_t *vm_as(const char *code) {
                 break;
             case VM_OP_NOP:
                 if(node->arg_count != 0) {
-                    fprintf(stderr, "vm_as: 'nop' requires zero arguements!\n");
+                    fprintf(stderr, "vm_as: 'nop' requires zero arguments!\n");
                     exit(EXIT_FAILURE);
                 }
 
                 instr = vm_encode(node->op, 0, 0, 0);
 
                 break;
+            case VM_OP_CALL:
+                if(node->arg_count != 1) {
+                    fprintf(stderr, "vm_as: 'call' requires one argument!\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                if(node->args[0].type != AST_NODE_ARG_REG) {
+                    fprintf(stderr, "vm_as: 'call' requires reg arguments!\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                instr = vm_encode(node->op, node->args[0].reg, 0, 0);
+
+                break;
             case VM_OP_RET:
                 if(node->arg_count != 0) {
-                    fprintf(stderr, "vm_as: 'ret' requires zero arguements!\n");
+                    fprintf(stderr, "vm_as: 'ret' requires zero arguments (%d)!\n", (int) node->arg_count);
                     exit(EXIT_FAILURE);
                 }
 
@@ -260,6 +274,8 @@ static ast_node_t *read_ast_node(const char *code, size_t *codei) {
         node->op = VM_OP_JMP;
     else if(vm_as_expect(code, codei, "ret"))
         node->op = VM_OP_RET;
+    else if(vm_as_expect(code, codei, "call"))
+        node->op = VM_OP_CALL;
     else {
         printf("read_ast_node: error at %d (0x%02x/%c)\n",
                 (int) *codei, code[*codei], code[*codei]);
