@@ -102,7 +102,7 @@ vm_t *vm_as(const char *code) {
                 break;
             case VM_OP_JMP:
                 if(node->arg_count != 1) {
-                    fprintf(stderr, "vm_as: 'jmp' requires two arguments!\n");
+                    fprintf(stderr, "vm_as: 'jmp' requires one arguments!\n");
                     exit(EXIT_FAILURE);
                 }
 
@@ -112,6 +112,26 @@ vm_t *vm_as(const char *code) {
                 }
 
                 instr = vm_encode(node->op, node->args[0].reg, 0, 0);
+
+                break;
+            case VM_OP_JE:
+                if(node->arg_count != 3) {
+                    fprintf(stderr, "vm_as: 'je' requires three arguments!\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                if(node->args[0].type != AST_NODE_ARG_REG ||
+                        node->args[1].type != AST_NODE_ARG_REG ||
+                        node->args[2].type != AST_NODE_ARG_REG) {
+                    fprintf(stderr, "vm_as: 'je' requires reg arguments!\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                instr = vm_encode(
+                        node->op,
+                        node->args[0].reg,
+                        node->args[1].reg,
+                        node->args[2].reg);
 
                 break;
             case VM_OP_NOP:
@@ -272,6 +292,8 @@ static ast_node_t *read_ast_node(const char *code, size_t *codei) {
         node->op = VM_OP_ADD;
     else if(vm_as_expect(code, codei, "jmp"))
         node->op = VM_OP_JMP;
+    else if(vm_as_expect(code, codei, "je"))
+        node->op = VM_OP_JE;
     else if(vm_as_expect(code, codei, "ret"))
         node->op = VM_OP_RET;
     else if(vm_as_expect(code, codei, "call"))
