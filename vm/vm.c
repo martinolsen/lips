@@ -132,7 +132,11 @@ void vm_run(vm_t *vm) {
             case VM_OP_RET:
                 return;
             case VM_OP_JMP:
-                vm_pc_set(vm, vm_reg_get(vm, vm_decode_a(in)));
+                vm_pc_set(vm, vm_reg_get(vm, a));
+                break;
+            case VM_OP_JE:
+                if(vm_reg_get(vm, b) == vm_reg_get(vm, c))
+                    vm_pc_set(vm, vm_reg_get(vm, a));
                 break;
             case VM_OP_MOV:
                 vm_reg_set(vm, a, b);

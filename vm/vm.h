@@ -8,6 +8,7 @@ typedef enum {
     VM_OP_CALL = 0x01,
     VM_OP_RET  = 0x02,
     VM_OP_JMP  = 0x04,
+    VM_OP_JE   = 0x05,
     VM_OP_MOV  = 0x08,
     VM_OP_ADD  = 0x80,
 } vm_op_t;

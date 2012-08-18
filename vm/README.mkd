@@ -1,0 +1,52 @@
+# LIPS Virtual Machine
+
+## Instructions
+
+### Arithmetic
+
+#### ADD - *integer addition*
+
+Add together the values pointed to by registers in second and third
+argument, store result in register pointed to by first argument.
+
+#### Syntax
+
+    ADD reg, reg, reg
+
+### Branching
+
+#### CALL - *call function*
+
+Transfer control to a function (label) pointed to by register in first
+argument. Registers are **NOT** currently preserved by the CALL instruction.
+
+##### Syntax
+
+    CALL reg
+
+#### JMP - *local jump*
+
+Unconditionally jump to location pointed to by register in first argument.
+
+##### Syntax
+
+    JMP reg
+
+#### RET - *return from function*
+
+Return to calling function.
+
+##### Syntax
+
+    RET
+
+### I/O
+
+#### READ - *read from filedescriptor*
+
+Will read a character from filedescriptor pointed to from register in the
+second argument, and store it in the register in the first arguemnt.
+
+##### Syntax
+
+    READ reg, reg

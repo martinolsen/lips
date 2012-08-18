@@ -77,6 +77,26 @@ void test_vm_jmp_label() {
     CU_ASSERT_NOT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
 }
 
+void test_vm_je() {
+    vm_t *vm = vm_as(
+            "mov %r0, 32\n"
+            "mov %r1, 32\n"
+            "mov %r2, lbl1\n"
+            "je %r2, %r0, %r1\n" // 32 == 32?
+            "ret\n"              // return 32 - ERROR
+            "lbl1: mov %r0, 42\n"
+            "mov %r2, lbl2\n"
+            "je %r2, %r0, %r1\n" // 42 == 32?
+            "ret\n"              // return 42 - OK
+            "lbl2: mov %r0, 52\n"
+            "ret\n");            // return 52 - ERROR
+    CU_ASSERT_PTR_NOT_NULL_FATAL(vm);
+
+    vm_run(vm);
+
+    CU_ASSERT_EQUAL_FATAL(vm_reg_get(vm, 0), 42);
+}
+
 void test_vm_call() {
     vm_t *vm = vm_as(
             "mov %r0, fn\n"
@@ -105,6 +125,7 @@ int setup_vm_suite() {
     ADD_TEST(suite, test_vm_ret, "Test VM - RET");
     ADD_TEST(suite, test_vm_jmp, "Test VM - JMP");
     ADD_TEST(suite, test_vm_jmp_label, "Test VM - JMP w/label");
+    ADD_TEST(suite, test_vm_je, "Test VM - JE");
     ADD_TEST(suite, test_vm_call, "Test VM - CALL");
 
     return 0;
