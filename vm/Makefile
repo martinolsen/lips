@@ -15,7 +15,7 @@ test: test_vm.o $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -lcunit -o $@ $^
 
 clean:
-	rm -f *.o *.d
+	rm -f *.o *.d test
 
 .c.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
